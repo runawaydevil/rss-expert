@@ -65,6 +65,24 @@ interop knowledge that makes it possible came from other people's work:
   JSON Feed           Manton Reece and Brent Simmons.
                       https://www.jsonfeed.org/
 
+The way this thing looks owes a debt too:
+
+  egg.design          The Starlight and Sunset pages by cornetespoir, whose
+  (cornetespoir)      gradient skies, translucent panels, squared-off bubble
+                      corner and ringed round badges are the visual language
+                      this interface follows. Their repository carries no
+                      licence, so none of their code is here -- the stylesheet
+                      is ours. The feeling is theirs.
+                      https://egg.design/
+                      https://github.com/cornetespoir/page-faq
+
+  Gerrit Halfmann     Pixelarticons, the 24x24 pixel icon set. MIT.
+                      https://github.com/halfmage/pixelarticons
+
+  Type                Fraunces, Atkinson Hyperlegible and JetBrains Mono, all
+                      open licensed and served from this instance rather than
+                      from someone else's CDN.
+
 None of them endorse this. Interop bugs and broken real-world feeds we find go
 back upstream.
 

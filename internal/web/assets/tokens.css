@@ -1,0 +1,204 @@
+@font-face {
+	font-family: "Fraunces";
+	src: url("/assets/fonts/fraunces-latin.woff2") format("woff2");
+	font-weight: 400 700;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Atkinson";
+	src: url("/assets/fonts/atkinson-latin.woff2") format("woff2");
+	font-weight: 400 700;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "JetBrains Mono";
+	src: url("/assets/fonts/jetbrains-mono-latin.woff2") format("woff2");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
+:root {
+	color-scheme: light dark;
+
+	--font-display: "Fraunces", Georgia, serif;
+	--font-body: "Atkinson", system-ui, -apple-system, "Segoe UI", sans-serif;
+	--font-state: "JetBrains Mono", ui-monospace, Consolas, monospace;
+
+	--text-xs: 0.78rem;
+	--text-sm: 0.875rem;
+	--text-base: 1rem;
+	--text-read: 1.0625rem;
+	--text-md: 1.2rem;
+	--text-lg: 1.45rem;
+	--text-xl: 1.85rem;
+	--text-2xl: 2.4rem;
+
+	--leading-tight: 1.16;
+	--leading-ui: 1.5;
+	--leading-read: 1.62;
+
+	--measure: 62ch;
+
+	--space-1: 0.25rem;
+	--space-2: 0.5rem;
+	--space-3: 0.75rem;
+	--space-4: 1rem;
+	--space-5: 1.5rem;
+	--space-6: 2rem;
+	--space-7: 3rem;
+	--space-8: 4rem;
+
+	--radius: 12px;
+	--radius-sm: 8px;
+	--radius-pill: 999px;
+	--rail: 4px;
+	--ring: 3px;
+
+	--sky-1: #e4dff2;
+	--sky-2: #fbe9df;
+	--sky-3: #fdf4dd;
+
+	--ink: #2a2333;
+	--ink-2: #635a70;
+	--ink-3: #8d8499;
+	--rule: rgba(42, 35, 51, 0.13);
+	--rule-strong: rgba(42, 35, 51, 0.28);
+
+	--card: rgba(255, 255, 255, 0.76);
+	--card-2: rgba(255, 255, 255, 0.5);
+	--sunk: rgba(42, 35, 51, 0.055);
+
+	--lavender: #6a4c9c;
+	--coral: #c1543c;
+	--gold: #96690c;
+	--dusk: #4c5a7c;
+	--fern: #4a6f4a;
+
+	--lavender-wash: #e6dcf6;
+	--coral-wash: #fbded5;
+	--gold-wash: #faeac6;
+	--dusk-wash: #dee3ef;
+	--fern-wash: #dfeada;
+
+	--accent: var(--coral);
+	--accent-wash: var(--coral-wash);
+	--ok: var(--fern);
+	--warn: var(--gold);
+	--err: #b03826;
+	--focus: var(--lavender);
+
+	--card-y: var(--space-5);
+	--stack: var(--space-6);
+}
+
+:root[data-density="compact"] {
+	--card-y: var(--space-3);
+	--stack: var(--space-4);
+	--text-read: 1rem;
+	--leading-read: 1.5;
+}
+
+:root[data-density="editorial"] {
+	--card-y: var(--space-6);
+	--stack: var(--space-8);
+	--text-read: 1.125rem;
+	--leading-read: 1.72;
+	--measure: 56ch;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--sky-1: #241d38;
+		--sky-2: #1d1830;
+		--sky-3: #171325;
+
+		--ink: #ece5f6;
+		--ink-2: #b0a6c2;
+		--ink-3: #837a94;
+		--rule: rgba(236, 229, 246, 0.14);
+		--rule-strong: rgba(236, 229, 246, 0.3);
+
+		--card: rgba(255, 255, 255, 0.055);
+		--card-2: rgba(255, 255, 255, 0.025);
+		--sunk: rgba(0, 0, 0, 0.22);
+
+		--lavender: #cbb2ed;
+		--coral: #fbab97;
+		--gold: #f4c884;
+		--dusk: #a8b6d6;
+		--fern: #a3c99b;
+
+		--lavender-wash: rgba(203, 178, 237, 0.16);
+		--coral-wash: rgba(251, 171, 151, 0.16);
+		--gold-wash: rgba(244, 200, 132, 0.16);
+		--dusk-wash: rgba(168, 182, 214, 0.16);
+		--fern-wash: rgba(163, 201, 155, 0.16);
+
+		--err: #f0917d;
+	}
+}
+
+:root[data-theme="dark"] {
+	--sky-1: #241d38;
+	--sky-2: #1d1830;
+	--sky-3: #171325;
+
+	--ink: #ece5f6;
+	--ink-2: #b0a6c2;
+	--ink-3: #837a94;
+	--rule: rgba(236, 229, 246, 0.14);
+	--rule-strong: rgba(236, 229, 246, 0.3);
+
+	--card: rgba(255, 255, 255, 0.055);
+	--card-2: rgba(255, 255, 255, 0.025);
+	--sunk: rgba(0, 0, 0, 0.22);
+
+	--lavender: #cbb2ed;
+	--coral: #fbab97;
+	--gold: #f4c884;
+	--dusk: #a8b6d6;
+	--fern: #a3c99b;
+
+	--lavender-wash: rgba(203, 178, 237, 0.16);
+	--coral-wash: rgba(251, 171, 151, 0.16);
+	--gold-wash: rgba(244, 200, 132, 0.16);
+	--dusk-wash: rgba(168, 182, 214, 0.16);
+	--fern-wash: rgba(163, 201, 155, 0.16);
+
+	--err: #f0917d;
+}
+
+:root[data-theme="light"] {
+	--sky-1: #e4dff2;
+	--sky-2: #fbe9df;
+	--sky-3: #fdf4dd;
+
+	--ink: #2a2333;
+	--ink-2: #635a70;
+	--ink-3: #8d8499;
+	--rule: rgba(42, 35, 51, 0.13);
+	--rule-strong: rgba(42, 35, 51, 0.28);
+
+	--card: rgba(255, 255, 255, 0.76);
+	--card-2: rgba(255, 255, 255, 0.5);
+	--sunk: rgba(42, 35, 51, 0.055);
+
+	--lavender: #6a4c9c;
+	--coral: #c1543c;
+	--gold: #96690c;
+	--dusk: #4c5a7c;
+	--fern: #4a6f4a;
+
+	--lavender-wash: #e6dcf6;
+	--coral-wash: #fbded5;
+	--gold-wash: #faeac6;
+	--dusk-wash: #dee3ef;
+	--fern-wash: #dfeada;
+
+	--err: #b03826;
+}

@@ -20,7 +20,17 @@ func NewApp(db *store.DB, log *slog.Logger, domain string) *App {
 func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", a.root)
+	mux.Handle("GET /assets/", assetHandler())
+	mux.HandleFunc("GET /dev/specimen", a.specimen)
 	return securityHeaders(mux)
+}
+
+func (a *App) specimen(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	if err := templates.ExecuteTemplate(w, "specimen.html", nil); err != nil {
+		a.log.Error("specimen render failed", "error", err)
+	}
 }
 
 func (a *App) root(w http.ResponseWriter, r *http.Request) {
