@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:source="https://source.scripting.com/">
+	<channel>
+		<title>Alice</title>
+		<link>https://alice.example/</link>
+		<description>Notes from Alice</description>
+		<language>en-us</language>
+		<pubDate>Thu, 23 Jul 2026 17:40:00 GMT</pubDate>
+		<lastBuildDate>Thu, 23 Jul 2026 18:00:00 GMT</lastBuildDate>
+		<generator>rss-social</generator>
+		<docs>https://www.rssboard.org/rss-specification</docs>
+		<source:self>https://alice.example/rss.xml</source:self>
+		<source:account service="bluesky">@alice.example</source:account>
+		<item>
+			<title>On feeds</title>
+			<description>&lt;p&gt;A thread has to start &lt;em&gt;somewhere&lt;/em&gt;.&lt;/p&gt;</description>
+			<pubDate>Thu, 23 Jul 2026 17:40:00 GMT</pubDate>
+			<guid>https://alice.example/p/1</guid>
+			<source:markdown>A thread has to start *somewhere*.</source:markdown>
+			<source:comments count="2" feedUrl="https://alice.example/p/1/replies.xml"/>
+		</item>
+	</channel>
+</rss>

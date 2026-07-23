@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:source="https://source.scripting.com/" xmlns:thr="http://purl.org/syndication/thread/1.0">
+	<channel>
+		<title>Replies to a post by Bob</title>
+		<link>https://bob.example/p/7</link>
+		<description>Replies to a post by Bob</description>
+		<pubDate>Thu, 23 Jul 2026 17:52:00 GMT</pubDate>
+		<lastBuildDate>Thu, 23 Jul 2026 18:00:00 GMT</lastBuildDate>
+		<generator>rss-social</generator>
+		<docs>https://www.rssboard.org/rss-specification</docs>
+		<source:self>https://bob.example/p/7/replies.xml</source:self>
+		<item>
+			<description>&lt;p&gt;Three levels is enough to prove it walks.&lt;/p&gt;</description>
+			<pubDate>Thu, 23 Jul 2026 17:52:00 GMT</pubDate>
+			<guid>https://alice.example/p/3</guid>
+			<source url="https://alice.example/rss.xml">Alice</source>
+			<source:markdown>Three levels is enough to prove it walks.</source:markdown>
+			<source:inReplyTo>https://bob.example/p/7</source:inReplyTo>
+			<thr:in-reply-to ref="https://bob.example/p/7"/>
+		</item>
+	</channel>
+</rss>

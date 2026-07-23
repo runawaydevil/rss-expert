@@ -53,8 +53,14 @@ type Item struct {
 	InReplyTo       string
 	CommentsPage    string
 	Comments        *Comments
+	Source          *Source
 	Enclosures      []Enclosure
 	Unknown         []Element
+}
+
+type Source struct {
+	URL  string
+	Name string
 }
 
 type Comments struct {

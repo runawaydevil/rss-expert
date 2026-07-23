@@ -44,6 +44,7 @@ type itemScan struct {
 	inReplyTo     string
 	commentsPage  string
 	comments      *feed.Comments
+	source        *feed.Source
 	unknown       []feed.Element
 }
 
@@ -122,6 +123,13 @@ func scanItem(el *feed.Element) itemScan {
 	if it.inReplyTo == "" {
 		if thr := el.Child(feed.NSThread, "in-reply-to"); thr != nil {
 			it.inReplyTo = firstNonEmpty(thr.Attr("ref"), thr.Attr("href"))
+		}
+	}
+	if s := el.Child("", "source"); s != nil {
+		url := s.Attr("url")
+		name := strings.TrimSpace(s.Text)
+		if url != "" || name != "" {
+			it.source = &feed.Source{URL: url, Name: name}
 		}
 	}
 	if c := el.Child(feed.NSSource, "comments"); c != nil {

@@ -101,6 +101,7 @@ func overlay(f *feed.Feed, scan *channelScan) {
 		it.InReplyTo = s.inReplyTo
 		it.CommentsPage = s.commentsPage
 		it.Comments = s.comments
+		it.Source = s.source
 		it.Unknown = s.unknown
 	}
 }
