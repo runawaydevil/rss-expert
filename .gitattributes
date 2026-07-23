@@ -1,0 +1,6 @@
+* text=auto eol=lf
+
+testdata/** -text
+web/assets/fonts/** binary
+*.png binary
+*.woff2 binary
