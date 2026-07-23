@@ -1,0 +1,32 @@
+# Binaries
+/rss-social
+/rss-social.exe
+/dist/
+
+# Local runtime data
+/data/
+*.db
+*.db-wal
+*.db-shm
+
+# templ-generated code
+*_templ.go
+
+# CI tooling (Node lives here only, never in the build)
+/tools/threadwalker/node_modules/
+
+# Test and profiling output
+*.test
+*.out
+*.prof
+/testdata/tmp/
+
+# Environment
+.env
+.env.local
+
+# Editors
+.vscode/
+.idea/
+*.swp
+.DS_Store
