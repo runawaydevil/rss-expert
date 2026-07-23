@@ -1,0 +1,18 @@
+services:
+  rss-social:
+    image: ghcr.io/runawaydevil/rss-social:0.0.1
+    build: .
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    ports:
+      - "11080:11080"
+    volumes:
+      - ./data:/data
+    environment:
+      RSS_SOCIAL_DOMAIN: example.org
+      RSS_SOCIAL_SMTP_URL: ""
+      GOMEMLIMIT: 400MiB

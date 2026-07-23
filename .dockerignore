@@ -1,0 +1,11 @@
+.git
+.github
+data
+docs
+testdata/tmp
+tools/threadwalker/node_modules
+rss-social
+rss-social.exe
+*.db
+*.db-wal
+*.db-shm
