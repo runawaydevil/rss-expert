@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"log/slog"
 
@@ -33,14 +34,31 @@ func (m *mailbox) capture() *mail.Sender {
 	return sender
 }
 
+func (m *mailbox) waitForMail(t *testing.T) string {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		m.mu.Lock()
+		n := len(m.messages)
+		var body string
+		if n > 0 {
+			body = m.messages[n-1].Body
+		}
+		m.mu.Unlock()
+
+		if n > 0 {
+			return body
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("no mail was sent")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func (m *mailbox) lastLink(t *testing.T) string {
 	t.Helper()
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if len(m.messages) == 0 {
-		t.Fatal("no mail was sent")
-	}
-	body := m.messages[len(m.messages)-1].Body
+	body := m.waitForMail(t)
 	link := regexp.MustCompile(`https?://\S+/account/\S+`).FindString(body)
 	if link == "" {
 		t.Fatalf("no account link in the message:\n%s", body)

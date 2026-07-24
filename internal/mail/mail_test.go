@@ -58,15 +58,15 @@ func TestAMessageLooksLikeMail(t *testing.T) {
 }
 
 func TestTheFromAddressCanBeSetOnTheURL(t *testing.T) {
-	sender, body, _ := captured(t, "smtps://mail.example.org?from=hello%40pablomurad.com")
+	sender, body, _ := captured(t, "smtps://mail.example.org?from=hello%40example.org")
 
-	if sender.From() != "hello@pablomurad.com" {
+	if sender.From() != "hello@example.org" {
 		t.Errorf("from = %q", sender.From())
 	}
 	if err := sender.Send(context.Background(), Message{To: "x@example.org"}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(*body, "From: hello@pablomurad.com") {
+	if !strings.Contains(*body, "From: hello@example.org") {
 		t.Errorf("the from address was not used:\n%s", *body)
 	}
 }
