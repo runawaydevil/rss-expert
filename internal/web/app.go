@@ -145,6 +145,7 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /users/rss.xml", a.firehoseFeed)
 	mux.HandleFunc("GET /users/{handle}/rss.xml", a.accountFeed)
 	mux.HandleFunc("GET /users/{handle}", a.profile)
+	mux.HandleFunc("GET /settings", a.auth.requireAccount(a.settingsPage))
 	mux.HandleFunc("GET /settings/sites", a.auth.requireAccount(a.sitesPage))
 	mux.HandleFunc("POST /settings/sites/claim", a.auth.requireAccount(a.claimSite))
 	mux.HandleFunc("POST /settings/sites/verify", a.auth.requireAccount(a.verifySite))

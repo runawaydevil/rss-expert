@@ -99,7 +99,7 @@ func (a *App) postPage(w http.ResponseWriter, r *http.Request) {
 		"Post":       localView(post),
 		"Replies":    localViews(replies),
 		"Thread":     branches,
-		"RepliesURL": a.posts.RepliesURL(post.ID),
+		"RepliesURL": a.posts.RepliesPath(post.ID),
 	})
 }
 

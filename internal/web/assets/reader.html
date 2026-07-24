@@ -21,8 +21,8 @@
 					<span class="menu-role">{{.Account.Role}}</span>
 				</p>
 				<a href="/sources">{{icon "rss"}} Sources</a>
-				<a href="/saved">{{icon "bookmark"}} Saved</a>
-				<a href="/conversations">{{icon "comment"}} Conversations</a>
+				<a href="/?view=saved">{{icon "bookmark"}} Saved</a>
+				<a href="/?view=conversations">{{icon "comment"}} Conversations</a>
 				<a href="/settings">{{icon "book-open"}} Settings</a>
 				{{if .Account.Role.CanAdminister}}
 				<a href="/admin">{{icon "check"}} Administration</a>
@@ -121,7 +121,7 @@
 					<input type="hidden" name="action" value="{{if .Saved}}unsave{{else}}save{{end}}">
 					<button type="submit" data-tip="Keeps a copy here, even if the source edits or deletes it.">{{icon "bookmark"}} {{if .Saved}}Saved{{else}}Save{{end}}</button>
 				</form>
-				<a href="/reply?to={{.URL}}"
+				<a href="/write?to={{.URL}}"
 					aria-label="Reply. Your reply is published in your own feed; their site reads it back from there."
 					data-tip="Your reply is published in your own feed. Their site reads it back from there.">{{icon "comment"}} Reply</a>
 				{{end}}
@@ -132,7 +132,19 @@
 			</footer>
 		</article>
 		{{else}}
-		<p class="empty">Nothing here yet. This instance has not read any feeds.</p>
+		{{if .Search}}
+		<p class="empty">Nothing here matches that search. It looks through the posts this
+		instance has already read — it does not search the wider web.</p>
+		{{else if .Older}}
+		<p class="empty">Nothing older to show.</p>
+		{{else}}
+		<p class="empty">Nothing here yet. <a href="/sources">Follow a feed</a> and it fills up.</p>
+		{{end}}
+		{{end}}
+
+		{{if .Older}}
+		<p class="more"><a class="button-quiet" href="{{.Older}}"
+			data-tip="The next page, older than the last post above.">Load more</a></p>
 		{{end}}
 	</main>
 </div>

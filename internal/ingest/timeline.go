@@ -210,6 +210,7 @@ type Query struct {
 	Before     time.Time
 	UnreadOnly bool
 	SavedOnly  bool
+	Threaded   bool
 	SourceIDs  []int64
 	Keys       []string
 	Scope      Scope
@@ -255,6 +256,10 @@ func (s *Store) Select(ctx context.Context, q Query) ([]Item, error) {
 	}
 	if q.SavedOnly {
 		where = append(where, "r.saved_at is not null")
+	}
+	if q.Threaded {
+		where = append(where,
+			"(coalesce(l.in_reply_to, '') <> '' or coalesce(o.comments_count, 0) > 0)")
 	}
 	if len(q.SourceIDs) > 0 {
 		where = append(where, "o.source_id in ("+list(len(q.SourceIDs))+")")

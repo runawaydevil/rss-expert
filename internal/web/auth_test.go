@@ -99,7 +99,7 @@ func TestLoggedOutReaderOffersLogin(t *testing.T) {
 	if strings.Contains(page, "/logout") {
 		t.Error("a signed-out visitor was offered a sign-out control")
 	}
-	if strings.Contains(page, "/reply?to=") {
+	if strings.Contains(page, "/write?to=") {
 		t.Error("a signed-out visitor was offered reply controls")
 	}
 }
@@ -118,7 +118,7 @@ func TestSignInThenReaderShowsTheAccount(t *testing.T) {
 	h.ServeHTTP(rec, req)
 
 	page := rec.Body.String()
-	for _, want := range []string{"owner@example.org", "/logout", "/reply?to=", "Administration"} {
+	for _, want := range []string{"owner@example.org", "/logout", "/write?to=", "Administration"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("signed-in page is missing %q", want)
 		}

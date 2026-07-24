@@ -111,6 +111,10 @@ func (s *Store) PostURL(id int64) string {
 	return fmt.Sprintf("%s/p/%d", s.baseURL(), id)
 }
 
+func (s *Store) RepliesPath(id int64) string {
+	return fmt.Sprintf("/p/%d/replies.xml", id)
+}
+
 func (s *Store) RepliesURL(id int64) string {
 	return fmt.Sprintf("%s/p/%d/replies.xml", s.baseURL(), id)
 }

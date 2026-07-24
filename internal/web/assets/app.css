@@ -1513,6 +1513,10 @@ a {
 	margin: 0 auto var(--space-3);
 }
 
+.fresh[hidden] {
+	display: none;
+}
+
 .fresh {
 	position: sticky;
 	top: var(--space-3);
@@ -1528,4 +1532,26 @@ a {
 	border: 2px solid var(--ink);
 	border-radius: var(--radius-pill);
 	text-decoration: none;
+}
+
+.settings-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+}
+
+.settings-list a {
+	font-weight: 700;
+}
+
+.settings-list .note {
+	margin: var(--space-1) 0 0;
+}
+
+.more {
+	margin: var(--space-6) 0 0;
+	text-align: center;
 }

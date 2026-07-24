@@ -20,6 +20,7 @@ const (
 )
 
 var (
+	ErrSourceIsLocal   = errors.New("ingest: that is this instance's own feed, not a subscription")
 	ErrNoSource        = errors.New("no such source")
 	ErrSourceExists    = errors.New("this instance already follows that feed")
 	ErrFeedURLUnusable = errors.New("that is not a usable feed address")
@@ -40,6 +41,7 @@ type Source struct {
 	PollInterval time.Duration
 	NextPollAt   time.Time
 	Quarantined  bool
+	Local        bool
 }
 
 func (s *Source) Host() string {
@@ -100,7 +102,7 @@ func (s *Store) AddSource(ctx context.Context, feedURL string) (*Source, error) 
 const sourceColumns = `id, feed_url, coalesce(site_url, ''), coalesce(title, ''),
 	coalesce(self_url, ''), coalesce(etag, ''), coalesce(last_modified, ''),
 	coalesce(last_fetch_at, 0), coalesce(last_status, 0), coalesce(last_error, ''),
-	failure_count, poll_interval, next_poll_at, quarantined_at is not null`
+	failure_count, poll_interval, next_poll_at, quarantined_at is not null, is_local`
 
 func scanSource(row interface{ Scan(...any) error }) (*Source, error) {
 	var (
@@ -111,7 +113,7 @@ func scanSource(row interface{ Scan(...any) error }) (*Source, error) {
 	)
 	err := row.Scan(&s.ID, &s.FeedURL, &s.SiteURL, &s.Title, &s.SelfURL, &s.ETag,
 		&s.LastModified, &lastFetch, &s.LastStatus, &s.LastError, &s.FailureCount,
-		&pollInterval, &nextPoll, &s.Quarantined)
+		&pollInterval, &nextPoll, &s.Quarantined, &s.Local)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +144,8 @@ func (s *Store) SourceByURL(ctx context.Context, feedURL string) (*Source, error
 }
 
 func (s *Store) Sources(ctx context.Context) ([]*Source, error) {
-	rows, err := s.db.Read.QueryContext(ctx, `select `+sourceColumns+` from source order by id`)
+	rows, err := s.db.Read.QueryContext(ctx,
+		`select `+sourceColumns+` from source where is_local = 0 order by id`)
 	if err != nil {
 		return nil, err
 	}
@@ -261,6 +264,14 @@ func nullable(s string) any {
 }
 
 func (s *Store) RemoveSource(ctx context.Context, id int64) error {
+	source, err := s.SourceByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if source.Local {
+		return ErrSourceIsLocal
+	}
+
 	orphaned, err := s.itemsWinningOn(ctx, id)
 	if err != nil {
 		return err

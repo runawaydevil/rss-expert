@@ -1,0 +1,56 @@
+{{template "head" .}}
+<body>
+<a class="skip" href="#settings">Skip to the settings</a>
+
+<div class="page">
+	<header class="masthead">
+		<a class="wordmark" href="/"><img src="{{asset "mark.png"}}" alt="" width="40" height="40" decoding="async"> rss&#8202;expert</a>
+		<a class="button-primary" href="/">Back to reading</a>
+	</header>
+
+	<main id="settings">
+		<h1>Settings</h1>
+		<p class="lead">Signed in as <strong>{{.Account.Email}}</strong> — {{.Account.Role}}.</p>
+
+		<section class="block">
+			<ul class="settings-list">
+				<li>
+					<a href="/sources">{{icon "rss"}} Sources</a>
+					<p class="note">The feeds this instance follows, their health, and the OPML you
+					can take with you.</p>
+				</li>
+				<li>
+					<a href="/settings/sites">{{icon "external-link"}} Your site</a>
+					<p class="note">Claim a domain and let it stand for you here. Verification goes
+					both ways: the site links back, or it does not count.</p>
+				</li>
+				<li>
+					<a href="/settings/media">{{icon "book-open"}} Your files</a>
+					<p class="note">Images, audio and video. Location and camera data are stripped
+					before anything is stored.</p>
+				</li>
+				<li>
+					<a href="/settings/tokens">{{icon "check"}} App passwords</a>
+					<p class="note">Let another app post here over Micropub. Each one is revocable
+					on its own.</p>
+				</li>
+				<li>
+					<a href="/settings/two-factor">{{icon "check"}} Two-factor</a>
+					<p class="note">A code from your phone on top of the password.
+					{{if .TwoFactor}}On.{{else}}Off.{{end}}</p>
+				</li>
+			</ul>
+		</section>
+
+		<section class="block">
+			<h2>Your feed</h2>
+			<p class="lead">Everything you write travels here, and this is the address other people
+			subscribe to:</p>
+			<p><a class="button-primary inline-button" href="{{.FeedPath}}">{{icon "rss"}} {{.FeedPath}}</a></p>
+		</section>
+	</main>
+</div>
+
+{{template "colophon" .}}
+</body>
+</html>

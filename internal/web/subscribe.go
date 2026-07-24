@@ -132,6 +132,10 @@ func (a *App) refreshSource(w http.ResponseWriter, r *http.Request) {
 		a.sourcesProblem(w, r, "No such source.")
 		return
 	}
+	if source.Local {
+		a.sourcesProblem(w, r, "That is this instance's own feed, not a subscription.")
+		return
+	}
 
 	a.readNow(ctx, source)
 	http.Redirect(w, r, "/sources", http.StatusSeeOther)

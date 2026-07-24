@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -21,6 +22,11 @@ func (a *App) timeline(w http.ResponseWriter, r *http.Request) {
 	if account != nil {
 		query.AccountID = account.ID
 	}
+	if raw := r.URL.Query().Get("before"); raw != "" {
+		if unix, err := strconv.ParseInt(raw, 10, 64); err == nil {
+			query.Before = time.Unix(unix, 0).UTC()
+		}
+	}
 
 	name := r.URL.Query().Get("view")
 	label := "Everything"
@@ -30,6 +36,8 @@ func (a *App) timeline(w http.ResponseWriter, r *http.Request) {
 		query.UnreadOnly, label = true, "Unread"
 	case "saved":
 		query.SavedOnly, label = true, "Saved"
+	case "conversations":
+		query.Threaded, label = true, "Conversations"
 	}
 
 	scope := ingest.Scope(r.URL.Query().Get("scope"))
@@ -85,11 +93,24 @@ func (a *App) timeline(w http.ResponseWriter, r *http.Request) {
 		a.log.Error("could not read the newest item time", "error", err)
 	}
 
+	older := ""
+	if len(items) == timelinePage {
+		oldest := items[len(items)-1]
+		when := oldest.Published
+		if when.IsZero() {
+			when = oldest.Updated
+		}
+		if !when.IsZero() {
+			older = moreLink(r.URL, when)
+		}
+	}
+
 	data := map[string]any{
 		"Title":  "RSS Expert",
 		"Posts":  a.decorate(ctx, account, items),
 		"View":   name,
 		"Latest": latest,
+		"Older":  older,
 		"Scope":  string(scope),
 		"Label":  label,
 		"Search": search,
@@ -323,4 +344,36 @@ func (a *App) collections(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	http.Redirect(w, r, "/sources", http.StatusSeeOther)
+}
+
+func moreLink(current *url.URL, before time.Time) string {
+	next := url.Values{}
+	for _, keep := range []string{"view", "scope", "q", "collection"} {
+		if v := current.Query().Get(keep); v != "" {
+			next.Set(keep, v)
+		}
+	}
+	next.Set("before", strconv.FormatInt(before.Unix(), 10))
+	return "/?" + next.Encode()
+}
+
+func (a *App) settingsPage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	account := accountFrom(ctx)
+
+	twoFactor, err := a.accounts.TOTPEnabled(ctx, account.ID)
+	if err != nil {
+		a.log.Error("could not read two-factor state", "error", err)
+	}
+
+	feedPath := "/users/rss.xml"
+	if handle, err := a.posts.HandleFor(ctx, account.ID); err == nil {
+		feedPath = "/users/" + handle + "/rss.xml"
+	}
+
+	a.render(w, r, "settings.html", map[string]any{
+		"Title":     "Settings — RSS Expert",
+		"TwoFactor": twoFactor,
+		"FeedPath":  feedPath,
+	})
 }
