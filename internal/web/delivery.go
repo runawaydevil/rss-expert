@@ -41,6 +41,8 @@ func queueSpec(mentionID int64) jobs.Spec {
 }
 
 func (a *App) afterPublish(r *http.Request, post *publish.Post) {
+	a.announce(context.WithoutCancel(r.Context()), post)
+
 	if post.InReplyTo == "" {
 		return
 	}
@@ -51,6 +53,20 @@ func (a *App) afterPublish(r *http.Request, post *publish.Post) {
 	})
 	if err != nil && !errors.Is(err, jobs.ErrDuplicate) {
 		a.log.Error("could not queue a webmention", "error", err)
+	}
+}
+
+func (a *App) announce(ctx context.Context, post *publish.Post) {
+	topics := []string{a.posts.FirehoseURL()}
+	if post.Handle != "" {
+		topics = append(topics, a.posts.AccountFeedURL(post.Handle))
+	}
+	if post.InReplyTo != "" {
+		topics = append(topics, a.posts.RepliesURL(post.ID))
+	}
+
+	for _, topic := range topics {
+		go a.Distribute(ctx, topic)
 	}
 }
 

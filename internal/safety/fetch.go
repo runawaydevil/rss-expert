@@ -1,6 +1,7 @@
 package safety
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -242,4 +243,33 @@ func (f *Fetcher) Do(req *http.Request) (*http.Response, error) {
 		io.Closer
 	}{io.LimitReader(resp.Body, f.maxBytes), resp.Body}
 	return resp, nil
+}
+
+func (f *Fetcher) Post(ctx context.Context, rawURL string, header http.Header, body []byte) (*Result, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, fmt.Errorf("parse url: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	for name, values := range header {
+		for _, value := range values {
+			req.Header.Add(name, value)
+		}
+	}
+
+	resp, err := f.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	answer, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return &Result{URL: resp.Request.URL, StatusCode: resp.StatusCode, Header: resp.Header, Body: answer}, nil
 }

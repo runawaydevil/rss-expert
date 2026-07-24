@@ -12,6 +12,34 @@
 		<h1>Administration</h1>
 
 		<section class="block">
+			<h2>Invitations</h2>
+			<p class="lead">Registration is <strong>{{.Registration}}</strong>.
+			{{if eq .Registration "closed"}}Nobody can create an account. An invitation still works —
+			it opens the door for one address.
+			{{else if eq .Registration "invite"}}Only people you invite can create an account.
+			{{else}}Anyone can create an account. You can still invite someone directly.{{end}}</p>
+
+			{{if eq .Invite "sent"}}
+			<p class="note">Invitation sent.</p>
+			{{else if eq .Invite "missing"}}
+			<p class="form-problem" role="alert">Give an address to invite.</p>
+			{{else if eq .Invite "failed"}}
+			<p class="form-problem" role="alert">It could not be issued. Try again.</p>
+			{{else if .Invite}}
+			<p class="note">No mail server is set, so hand this to them yourself. Code, good for a week:
+			<br><code class="token-fresh">{{.Invite}}</code></p>
+			{{end}}
+
+			<form method="post" action="/admin/invite" class="inline-form">
+				<input type="hidden" name="csrf" value="{{.CSRF}}">
+				<label class="sr-only" for="invite-email">Email to invite</label>
+				<input id="invite-email" name="email" type="email" required placeholder="them@example.org"
+					inputmode="email" spellcheck="false">
+				<button type="submit" class="button-quiet">{{if .MailReady}}Send invitation{{else}}Make a code{{end}}</button>
+			</form>
+		</section>
+
+		<section class="block">
 			<h2>What is in the store</h2>
 			<dl class="facts-grid">
 				<div><dt>Items</dt><dd>{{.Items}}</dd></div>

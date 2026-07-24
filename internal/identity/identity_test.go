@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -17,11 +18,19 @@ func testStore(t *testing.T) *Store {
 	t.Helper()
 	ctx := context.Background()
 
-	db, err := store.Open(ctx, filepath.Join(t.TempDir(), "test.db"))
+	dir, err := os.MkdirTemp("", "rss-expert-identity")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { db.Close() })
+	db, err := store.Open(ctx, filepath.Join(dir, "test.db"))
+	if err != nil {
+		os.RemoveAll(dir)
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		db.Close()
+		os.RemoveAll(dir)
+	})
 
 	if _, err := db.Migrate(ctx); err != nil {
 		t.Fatal(err)

@@ -51,32 +51,16 @@
 			</footer>
 		</article>
 
-		{{if .Replies}}
-		<h2 class="replies-heading">{{len .Replies}} {{if eq (len .Replies) 1}}reply{{else}}replies{{end}}</h2>
+		{{if .Thread}}
+		<h2 class="replies-heading">{{len .Thread}} {{if eq (len .Thread) 1}}reply{{else}}replies{{end}}</h2>
 		<ul class="reader replies">
-			{{range .Replies}}
-			<li class="post post-reply">
-				<header class="post-head">
-					<span class="avatar" aria-hidden="true">{{.Initial}}</span>
-					<span class="who">{{.Author}}</span>
-					<time class="when" datetime="{{.PublishedISO}}">{{.Age}}</time>
-				</header>
-				{{if .InReplyTo}}
-				<p class="in-reply-to">In reply to <a class="u-in-reply-to" href="{{.InReplyTo}}">{{.InReplyTo}}</a></p>
-				{{end}}
-				<div class="prose">{{.HTML}}</div>
-				<footer class="post-foot">
-					{{if $.Account}}
-					<a href="/write?to={{.GUID}}"
-						data-tip="Replies nest. Each level carries its own feed.">{{icon "comment"}} Reply</a>
-					{{end}}
-					<a href="{{.URL}}">{{icon "external-link"}} Permalink</a>
-					<span class="via" title="{{.ArrivalTip}}">{{.Arrival}}</span>
-				</footer>
-			</li>
-			{{end}}
+			{{range .Thread}}{{template "branch" .}}{{end}}
 		</ul>
+		{{else}}
+		<p class="empty">No replies yet. Anyone whose site speaks RSS can leave one — they publish
+		it in their own feed, and it finds its way here.</p>
 		{{end}}
+
 	</main>
 </div>
 

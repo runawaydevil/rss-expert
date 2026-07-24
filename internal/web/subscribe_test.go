@@ -211,3 +211,65 @@ func TestUnfollowingRemovesIt(t *testing.T) {
 		t.Errorf("%d sources are still followed", len(list))
 	}
 }
+
+func TestThePreviewKeepsTheDraftWithoutPublishing(t *testing.T) {
+	h, _, session := readerApp(t)
+
+	page := getAs(t, h, "/write", session)
+	body, _ := io.ReadAll(page.Body)
+	m := csrfInput.FindSubmatch(body)
+
+	resp := postForm(t, h, "/write", url.Values{
+		"csrf":     {string(m[1])},
+		"title":    {"Half written"},
+		"markdown": {"A **bold** start."},
+		"preview":  {"1"},
+	}, append(page.Cookies(), session))
+
+	rendered, _ := io.ReadAll(resp.Body)
+	if !strings.Contains(string(rendered), "<strong>bold</strong>") {
+		t.Errorf("the preview did not render the markdown:\n%s", rendered)
+	}
+	if !strings.Contains(string(rendered), "How it will read") {
+		t.Error("the preview section is missing")
+	}
+
+	back, _ := io.ReadAll(getAs(t, h, "/write", session).Body)
+	if !strings.Contains(string(back), "A **bold** start.") {
+		t.Error("the draft was not there when the writer came back")
+	}
+	if !strings.Contains(string(back), "Half written") {
+		t.Error("the title was not kept")
+	}
+}
+
+func TestPublishingClearsTheDraft(t *testing.T) {
+	h, _, session := readerApp(t)
+
+	page := getAs(t, h, "/write", session)
+	body, _ := io.ReadAll(page.Body)
+	m := csrfInput.FindSubmatch(body)
+
+	postForm(t, h, "/write", url.Values{
+		"csrf":     {string(m[1])},
+		"markdown": {"Kept for later."},
+		"preview":  {"1"},
+	}, append(page.Cookies(), session))
+
+	page = getAs(t, h, "/write", session)
+	body, _ = io.ReadAll(page.Body)
+	m = csrfInput.FindSubmatch(body)
+
+	resp := postForm(t, h, "/write", url.Values{
+		"csrf":     {string(m[1])},
+		"markdown": {"Kept for later."},
+	}, append(page.Cookies(), session))
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("publishing gave %d", resp.StatusCode)
+	}
+
+	back, _ := io.ReadAll(getAs(t, h, "/write", session).Body)
+	if strings.Contains(string(back), "Kept for later.") {
+		t.Error("the draft survived publication")
+	}
+}

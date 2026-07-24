@@ -212,7 +212,18 @@ type Query struct {
 	SavedOnly  bool
 	SourceIDs  []int64
 	Keys       []string
+	Scope      Scope
+	FeedURL    string
 }
+
+type Scope string
+
+const (
+	Everything Scope = ""
+	Here       Scope = "here"
+	Elsewhere  Scope = "elsewhere"
+	Mine       Scope = "mine"
+)
 
 func (s *Store) Select(ctx context.Context, q Query) ([]Item, error) {
 	if q.Limit <= 0 {
@@ -226,6 +237,19 @@ func (s *Store) Select(ctx context.Context, q Query) ([]Item, error) {
 	where := []string{"coalesce(l.published_at, l.converged_at) < ?"}
 	args := []any{q.AccountID, cutoff}
 
+	switch q.Scope {
+	case Here:
+		where = append(where, "s.is_local = 1")
+	case Elsewhere:
+		where = append(where, "s.is_local = 0")
+	case Mine:
+		if q.FeedURL == "" {
+			where = append(where, "1 = 0")
+		} else {
+			where = append(where, "s.feed_url = ?")
+			args = append(args, q.FeedURL)
+		}
+	}
 	if q.UnreadOnly {
 		where = append(where, "r.read_at is null")
 	}

@@ -243,3 +243,8 @@ func decoyVerify(password string) {
 		VerifyPassword(hash, password)
 	}
 }
+
+func (s *Store) ByEmail(ctx context.Context, email string) (*Account, error) {
+	account, _, err := s.byEmail(ctx, email)
+	return account, err
+}

@@ -1,0 +1,37 @@
+{{template "head" .}}
+<body>
+<a class="skip" href="#form">Skip to the form</a>
+
+<div class="page">
+	<header class="masthead">
+		<a class="wordmark" href="/"><img src="{{asset "mark.png"}}" alt="" width="40" height="40" decoding="async"> rss&#8202;expert</a>
+	</header>
+
+	<main id="form">
+		<form class="panel form panel-narrow" method="post" action="/account/forgot">
+			<h1>Sign in by email</h1>
+			<p class="lead">Give the address on your account and we send a link that signs you in.
+			No password to remember.</p>
+
+			{{if .Problem}}
+			<p class="form-problem" role="alert">{{.Problem}}</p>
+			{{end}}
+
+			<input type="hidden" name="csrf" value="{{.CSRF}}">
+
+			<label for="email">Email</label>
+			<input id="email" name="email" type="email" value="{{.Email}}" required autofocus
+				autocomplete="email" inputmode="email" spellcheck="false">
+
+			<button type="submit" class="button-primary">Send me a link</button>
+			<button type="submit" name="recover" value="1" class="button-quiet"
+				data-tip="Sends a link to set a new password instead of signing you straight in.">I forgot my password</button>
+
+			<p class="form-aside"><a href="/login">Sign in with a password instead.</a></p>
+		</form>
+	</main>
+</div>
+
+{{template "colophon" .}}
+</body>
+</html>

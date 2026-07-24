@@ -29,6 +29,32 @@
 </footer>
 {{end}}
 
+{{define "branch"}}
+<li class="post post-reply">
+	<header class="post-head">
+		<span class="avatar" aria-hidden="true">{{.Post.Initial}}</span>
+		<span class="who">{{.Post.Author}}</span>
+		{{if .Post.Site}}<a class="site" href="{{.Post.SiteURL}}">{{.Post.Site}}</a>{{end}}
+		<time class="when" datetime="{{.Post.PublishedISO}}">{{.Post.Age}}</time>
+	</header>
+
+	{{if .Post.Title}}<h3 class="reply-title"><a href="{{.Post.URL}}">{{.Post.Title}}</a></h3>{{end}}
+	<div class="prose">{{.Post.HTML}}</div>
+	{{template "attachments" .Post}}
+
+	{{if .Replies}}
+	<details class="branch" open>
+		<summary>{{len .Replies}} {{if eq (len .Replies) 1}}reply{{else}}replies{{end}}</summary>
+		<ul class="reader replies">
+			{{range .Replies}}{{template "branch" .}}{{end}}
+		</ul>
+	</details>
+	{{else if .Deeper}}
+	<p class="note"><a href="{{.Post.URL}}">{{.Deeper}} more below this one</a></p>
+	{{end}}
+</li>
+{{end}}
+
 {{define "attachments"}}
 {{if .Attachments}}
 <ul class="attachments">

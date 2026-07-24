@@ -64,6 +64,7 @@ func (a *App) subscribe(w http.ResponseWriter, r *http.Request) {
 
 	a.log.Info("source added", "id", source.ID, "url", source.FeedURL)
 	a.readNow(ctx, source)
+	a.AskForPush(ctx, source)
 	http.Redirect(w, r, "/sources", http.StatusSeeOther)
 }
 
@@ -148,6 +149,9 @@ func (a *App) unsubscribe(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		a.sourcesProblem(w, r, "No such source.")
 		return
+	}
+	if source, err := a.sources.SourceByID(ctx, id); err == nil {
+		a.LeaveHub(ctx, source)
 	}
 	if err := a.sources.RemoveSource(ctx, id); err != nil {
 		a.log.Error("could not remove a source", "id", id, "error", err)

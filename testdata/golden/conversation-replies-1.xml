@@ -8,6 +8,7 @@
 		<lastBuildDate>Thu, 23 Jul 2026 18:00:00 GMT</lastBuildDate>
 		<generator>rss-expert</generator>
 		<docs>https://www.rssboard.org/rss-specification</docs>
+		<atom:link rel="self" href="https://alice.example/p/1/replies.xml" type="application/rss+xml"/>
 		<source:self>https://alice.example/p/1/replies.xml</source:self>
 		<item>
 			<description>&lt;p&gt;Only if someone answers.&lt;/p&gt;</description>

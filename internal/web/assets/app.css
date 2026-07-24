@@ -99,13 +99,6 @@ a {
 	height: 2.5rem;
 }
 
-.form-logo {
-	display: block;
-	width: 11rem;
-	height: auto;
-	margin: 0 auto var(--space-2);
-}
-
 .button-primary {
 	font: inherit;
 	font-size: var(--text-sm);
@@ -1425,4 +1418,97 @@ a {
 	align-items: center;
 	gap: var(--space-3);
 	flex-wrap: wrap;
+}
+
+.scopes {
+	margin-bottom: var(--space-3);
+}
+
+.scopes a[aria-current="page"] {
+	background: var(--accent-wash);
+	border-color: var(--ink);
+}
+
+.branch {
+	margin-top: var(--space-3);
+}
+
+.branch > summary {
+	font-family: var(--font-state);
+	font-size: var(--text-xs);
+	color: var(--ink-3);
+	cursor: pointer;
+	padding: var(--space-1) 0;
+}
+
+.branch > summary::marker {
+	color: var(--ink-3);
+}
+
+.branch .replies {
+	margin-top: var(--space-3);
+	padding-left: var(--space-4);
+	border-left: 2px solid var(--rule);
+}
+
+.reply-title {
+	font-family: var(--font-display);
+	font-size: var(--text-md);
+	margin: 0 0 var(--space-2);
+}
+
+.write-actions {
+	display: flex;
+	gap: var(--space-3);
+	align-items: center;
+	margin: var(--space-4) 0 0;
+}
+
+.preview {
+	margin-top: var(--space-4);
+	padding: var(--space-4);
+	background: var(--sunk);
+	border-radius: var(--radius);
+}
+
+.preview h2 {
+	font-family: var(--font-state);
+	font-size: var(--text-xs);
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--ink-3);
+	margin: 0 0 var(--space-3);
+}
+
+.message {
+	padding: var(--space-6);
+}
+
+.message h1 {
+	margin-top: 0;
+}
+
+.inline-form {
+	display: flex;
+	gap: var(--space-2);
+	align-items: center;
+	flex-wrap: wrap;
+	margin-top: var(--space-3);
+}
+
+.inline-form input[type="email"] {
+	font: inherit;
+	font-size: var(--text-base);
+	padding: var(--space-2) var(--space-3);
+	border: 2px solid var(--rule-strong);
+	border-radius: var(--radius-sm);
+	background: var(--card);
+	min-width: 16rem;
+}
+
+.form-logo {
+	display: block;
+	width: 8rem;
+	height: auto;
+	margin: 0 auto var(--space-3);
 }

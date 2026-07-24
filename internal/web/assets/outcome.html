@@ -1,0 +1,20 @@
+{{template "head" .}}
+<body>
+<div class="page">
+	<header class="masthead">
+		<a class="wordmark" href="/"><img src="{{asset "mark.png"}}" alt="" width="40" height="40" decoding="async"> rss&#8202;expert</a>
+	</header>
+
+	<main>
+		<section class="panel panel-narrow message">
+			<h1>{{.Heading}}</h1>
+			<p class="lead">{{.Message}}</p>
+			<p class="form-aside"><a href="/account/forgot">Ask for a fresh link</a> or
+			<a href="/login">sign in with a password</a>.</p>
+		</section>
+	</main>
+</div>
+
+{{template "colophon" .}}
+</body>
+</html>

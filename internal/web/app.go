@@ -11,11 +11,13 @@ import (
 	"github.com/runawaydevil/rss-expert/internal/ingest"
 	"github.com/runawaydevil/rss-expert/internal/jobs"
 	"github.com/runawaydevil/rss-expert/internal/ledger"
+	"github.com/runawaydevil/rss-expert/internal/mail"
 	"github.com/runawaydevil/rss-expert/internal/media"
 	"github.com/runawaydevil/rss-expert/internal/micropub"
 	"github.com/runawaydevil/rss-expert/internal/moderation"
 	"github.com/runawaydevil/rss-expert/internal/poller"
 	"github.com/runawaydevil/rss-expert/internal/publish"
+	"github.com/runawaydevil/rss-expert/internal/push"
 	"github.com/runawaydevil/rss-expert/internal/reading"
 	"github.com/runawaydevil/rss-expert/internal/safety"
 	"github.com/runawaydevil/rss-expert/internal/store"
@@ -23,27 +25,30 @@ import (
 )
 
 type App struct {
-	db          *store.DB
-	accounts    *identity.Store
-	sources     *ingest.Store
-	posts       *publish.Store
-	sites       *indieweb.Store
-	mentions    *webmention.Store
-	tokens      *micropub.Store
-	media       *media.Store
-	reading     *reading.Store
-	moderation  *moderation.Store
-	queue       *jobs.Queue
-	ledger      *ledger.Ledger
-	auth        *auth
-	ops         *ops
-	fetcher     *safety.Fetcher
-	poller      *poller.Poller
-	log         *slog.Logger
-	domain      string
-	behindProxy bool
-	showPreview bool
-	dataDir     string
+	db           *store.DB
+	accounts     *identity.Store
+	sources      *ingest.Store
+	posts        *publish.Store
+	sites        *indieweb.Store
+	mentions     *webmention.Store
+	tokens       *micropub.Store
+	media        *media.Store
+	reading      *reading.Store
+	moderation   *moderation.Store
+	queue        *jobs.Queue
+	ledger       *ledger.Ledger
+	auth         *auth
+	ops          *ops
+	fetcher      *safety.Fetcher
+	push         *push.Store
+	mail         *mail.Sender
+	poller       *poller.Poller
+	log          *slog.Logger
+	domain       string
+	behindProxy  bool
+	showPreview  bool
+	dataDir      string
+	registration string
 }
 
 type Options struct {
@@ -56,6 +61,8 @@ type Options struct {
 	FetchLimit   int64
 	ReachPrivate bool
 	DataDir      string
+	Registration string
+	Mailer       *mail.Sender
 }
 
 func NewApp(db *store.DB, log *slog.Logger, domain string) *App {
@@ -95,16 +102,19 @@ func New(db *store.DB, log *slog.Logger, domain string, o Options) *App {
 		auth:       newAuth(accounts, log, o.BehindProxy),
 		ops:        newOps(db, o.Version, o.MetricsToken),
 		fetcher:    newFetcher(domain, o.FetchLimit, o.ReachPrivate),
+		push:       push.New(db),
+		mail:       o.Mailer,
 		poller: poller.New(sources, log, poller.Options{
 			UserAgent:         "rss-expert (+" + domain + ")",
 			AllowPrivateAddrs: o.ReachPrivate,
 			MaxBytes:          o.FetchLimit,
 		}),
-		log:         log,
-		domain:      domain,
-		behindProxy: o.BehindProxy,
-		showPreview: o.ShowPreview,
-		dataDir:     o.DataDir,
+		log:          log,
+		domain:       domain,
+		behindProxy:  o.BehindProxy,
+		showPreview:  o.ShowPreview,
+		dataDir:      o.DataDir,
+		registration: registrationMode(o.Registration),
 	}
 }
 
@@ -114,6 +124,15 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /login", a.auth.login)
 	mux.HandleFunc("POST /login", a.auth.submitLogin)
 	mux.HandleFunc("POST /logout", a.auth.logout)
+
+	mux.HandleFunc("GET /register", a.registerForm)
+	mux.HandleFunc("POST /register", a.submitRegister)
+	mux.HandleFunc("GET /account/verify", a.verifyEmail)
+	mux.HandleFunc("GET /account/forgot", a.magicForm)
+	mux.HandleFunc("POST /account/forgot", a.submitMagic)
+	mux.HandleFunc("GET /account/link", a.followMagic)
+	mux.HandleFunc("GET /account/recover", a.recoverForm)
+	mux.HandleFunc("POST /account/recover", a.submitRecover)
 	if a.showPreview {
 		mux.HandleFunc("GET /dev/preview", a.preview)
 	}
@@ -130,6 +149,13 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /p/{id}/journey", a.journey)
 
 	mux.HandleFunc("POST /webmention", a.receiveWebmention)
+
+	mux.HandleFunc("GET /websub/{source}", a.websubCallback)
+	mux.HandleFunc("POST /websub/{source}", a.websubCallback)
+	mux.HandleFunc("POST /websub/hub", a.hubEndpoint)
+	mux.HandleFunc("GET /rsscloud/{source}", a.cloudCallback)
+	mux.HandleFunc("POST /rsscloud/{source}", a.cloudCallback)
+	mux.HandleFunc("POST /rsscloud/pleaseNotify", a.cloudRegister)
 	mux.HandleFunc("GET /micropub", a.micropubEndpoint)
 	mux.HandleFunc("POST /micropub", a.micropubEndpoint)
 
@@ -150,6 +176,7 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /rules", a.rules)
 	mux.HandleFunc("GET /admin/status", a.requireModerator(a.statusPage))
 	mux.HandleFunc("POST /admin/backup", a.requireModerator(a.takeBackup))
+	mux.HandleFunc("POST /admin/invite", a.requireModerator(a.inviteForm))
 	mux.HandleFunc("GET /admin", a.requireModerator(a.adminPanel))
 	mux.HandleFunc("POST /admin/report", a.requireModerator(a.decideReport))
 	mux.HandleFunc("POST /admin/block", a.auth.requireAccount(a.blockSomething))
@@ -174,6 +201,15 @@ func (a *App) Handler() http.Handler {
 	mux.Handle("GET /assets/", assetHandler())
 
 	return securityHeaders(compressed(a.auth.resolve(mux)))
+}
+
+func registrationMode(mode string) string {
+	switch mode {
+	case "invite", "open":
+		return mode
+	default:
+		return "closed"
+	}
 }
 
 const timelinePage = 40

@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:source="https://source.scripting.com/" xmlns:ns1="https://vendor.example/ns" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<rss version="2.0" xmlns:source="https://source.scripting.com/" xmlns:ns1="https://vendor.example/ns" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:atom="http://www.w3.org/2005/Atom">
 	<channel>
 		<title>Relayed</title>
 		<link>https://relay.example/</link>
 		<lastBuildDate>Thu, 23 Jul 2026 18:00:00 GMT</lastBuildDate>
 		<generator>rss-expert</generator>
 		<docs>https://www.rssboard.org/rss-specification</docs>
+		<atom:link rel="self" href="https://relay.example/rss.xml" type="application/rss+xml"/>
 		<source:self>https://relay.example/rss.xml</source:self>
 		<source:localTime>Thu, July 23, 2026 12:15 PM EDT</source:localTime>
 		<item>

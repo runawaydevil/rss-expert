@@ -91,6 +91,9 @@ func (a *App) adminPanel(w http.ResponseWriter, r *http.Request) {
 		"DatabaseMiB":  float64(size) / (1 << 20),
 		"TwoFactor":    twoFactor,
 		"CodesLeft":    codesLeft,
+		"Registration": a.registration,
+		"Invite":       r.URL.Query().Get("invite"),
+		"MailReady":    a.mail != nil,
 	})
 }
 

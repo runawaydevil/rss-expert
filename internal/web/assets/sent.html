@@ -1,0 +1,29 @@
+{{template "head" .}}
+<body>
+<div class="page">
+	<header class="masthead">
+		<a class="wordmark" href="/"><img src="{{asset "mark.png"}}" alt="" width="40" height="40" decoding="async"> rss&#8202;expert</a>
+	</header>
+
+	<main>
+		<section class="panel panel-narrow message">
+			<h1>Check your mail</h1>
+			{{if eq .What "verify"}}
+			<p class="lead">If <strong>{{.Email}}</strong> is free, an account is waiting and a
+			confirmation link is on its way. Open it to finish.</p>
+			{{else if eq .What "recover"}}
+			<p class="lead">If <strong>{{.Email}}</strong> has an account, a link to set a new
+			password is on its way.</p>
+			{{else}}
+			<p class="lead">If <strong>{{.Email}}</strong> has an account, a sign-in link is on its
+			way. It works once and expires in two hours.</p>
+			{{end}}
+			<p class="form-aside">Nothing in your inbox after a few minutes? Check the spam folder,
+			then <a href="/account/forgot">ask again</a>.</p>
+		</section>
+	</main>
+</div>
+
+{{template "colophon" .}}
+</body>
+</html>

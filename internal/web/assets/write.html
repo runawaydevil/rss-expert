@@ -37,6 +37,13 @@
 			<label for="markdown">Text <span class="optional">Markdown. It travels as Markdown too, not only as HTML.</span></label>
 			<textarea id="markdown" name="markdown" rows="12" required autofocus>{{.Markdown}}</textarea>
 
+			{{if .Preview}}
+			<section class="preview">
+				<h2>How it will read</h2>
+				<div class="prose">{{.Preview}}</div>
+			</section>
+			{{end}}
+
 			{{if .Library}}
 			<fieldset class="attach">
 				<legend>Attach <span class="optional">from <a href="/settings/media">your files</a></span></legend>
@@ -51,7 +58,11 @@
 			</fieldset>
 			{{end}}
 
-			<button type="submit" class="button-primary">Publish</button>
+			<p class="write-actions">
+				<button type="submit" class="button-primary">Publish</button>
+				<button type="submit" name="preview" value="1" class="button-quiet"
+					data-tip="Renders it here without publishing. Your text is kept, so you can leave and come back.">Preview</button>
+			</p>
 
 			<p class="form-aside">Published here immediately, and carried out in your feed at
 			<code>/users/…/rss.xml</code> for anyone following you.</p>

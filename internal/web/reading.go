@@ -32,6 +32,24 @@ func (a *App) timeline(w http.ResponseWriter, r *http.Request) {
 		query.SavedOnly, label = true, "Saved"
 	}
 
+	scope := ingest.Scope(r.URL.Query().Get("scope"))
+	switch scope {
+	case ingest.Here:
+		query.Scope, label = scope, "Written here"
+	case ingest.Elsewhere:
+		query.Scope, label = scope, "From elsewhere"
+	case ingest.Mine:
+		query.Scope = scope
+		label = "Yours"
+		if account != nil {
+			if handle, err := a.posts.HandleFor(ctx, account.ID); err == nil {
+				query.FeedURL = a.posts.AccountFeedURL(handle)
+			}
+		}
+	default:
+		scope = ingest.Everything
+	}
+
 	if raw := r.URL.Query().Get("collection"); raw != "" && account != nil {
 		if id, err := strconv.ParseInt(raw, 10, 64); err == nil {
 			if ids, err := a.reading.CollectionSources(ctx, account.ID, id); err == nil {
@@ -66,6 +84,7 @@ func (a *App) timeline(w http.ResponseWriter, r *http.Request) {
 		"Title":  "RSS Expert",
 		"Posts":  a.decorate(ctx, account, items),
 		"View":   name,
+		"Scope":  string(scope),
 		"Label":  label,
 		"Search": search,
 	}

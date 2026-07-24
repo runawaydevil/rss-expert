@@ -324,3 +324,10 @@ func (s *Store) forget(ctx context.Context, key string) error {
 	}
 	return nil
 }
+
+func (s *Store) MarkPushed(ctx context.Context, sourceID int64, at time.Time) error {
+	_, err := s.db.Write.ExecContext(ctx,
+		`update source set last_push_at = ?, last_fetch_at = ?, failure_count = 0, last_error = null
+		 where id = ?`, at.Unix(), at.Unix(), sourceID)
+	return err
+}

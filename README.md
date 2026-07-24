@@ -1,10 +1,12 @@
-<img src="internal/web/assets/logo.png" alt="rss expert" width="200">
+<img src="assets/logo-web.png" alt="rss expert" width="200">
 
 rss-expert
 ==========
 
 A social reader for the open web. Reads feeds, publishes feeds, and threads
-conversations over plain RSS. No API required to participate.
+conversations over plain RSS -- in real time, in both directions, with no API
+required to participate. The timeline separates what was written here from what
+arrived from elsewhere, and keeps where every post came from.
 
 Single static binary, single SQLite file, single container. No JavaScript.
 
@@ -31,8 +33,12 @@ port: health, readiness, metrics and the status page all live behind it.
 
 The first owner account is created from the environment on first boot. After
 you have signed in, unset the password variable and restart -- it is only read
-when there is no owner yet. There is no sign-up page: accounts are made by the
-owner.
+when there is no owner yet.
+
+Who else may join depends on REGISTRATION: closed (the owner invites, one
+address at a time), invite (anyone with an invitation), or open (anyone). Email
+sign-in, confirmation and password recovery need SMTP_URL set; without it those
+pages exist but send nothing, and no link is ever written to the log.
 
 
 Environment
@@ -46,7 +52,9 @@ Everything is RSS_EXPERT_-prefixed. Only DOMAIN is required.
     DATA_DIR          database, uploads and backups      (data)
     ADMIN_EMAIL       owner account, first boot only
     ADMIN_PASSWORD    owner password, first boot only, 12 characters or more
-    SMTP_URL          for sign-in links; empty means no mail is sent
+    REGISTRATION      closed, invite or open             (closed)
+    SMTP_URL          mail server for links; empty sends nothing
+    MAIL_FROM         From address on those messages
     BEHIND_PROXY      trust X-Forwarded-* headers        (false)
     MEDIA_QUOTA_MB    uploads kept per account           (512)
     FETCH_LIMIT_MB    ceiling on any single fetch        (5)
@@ -94,7 +102,14 @@ Interop
 
 In:   RSS 2.0, Atom, JSON Feed 1.0/1.1, h-feed, OPML, WebSub, rssCloud
 Out:  per-user RSS and JSON, instance firehose, per-post comment feeds, OPML
-Also: Webmention (send and receive), Micropub with a media endpoint, IndieAuth
+Also: Webmention (send and receive), Micropub with a media endpoint,
+      domain as identity (rel=me and h-card, verified both ways)
+
+Push works both ways. As a subscriber it discovers a feed's hub or cloud, keeps
+the subscription renewed, and takes deliveries verified by their signature. As a
+publisher it is its own hub and its own cloud: it advertises both in every feed
+and tells its subscribers the moment something is published. Feeds it cannot get
+by push are polled on an adapting schedule with conditional requests.
 
 Threads use source:inReplyTo with thr:in-reply-to (RFC 4685) as a fallback.
 A post's guid is its bare permalink. Unknown XML elements are passed through

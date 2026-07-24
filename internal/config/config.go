@@ -27,6 +27,8 @@ type Config struct {
 	FetchLimit    int64
 	PollWorkers   int
 	CacheMiB      int
+	Registration  string
+	MailFrom      string
 }
 
 func Load() (Config, error) {
@@ -70,6 +72,14 @@ func Load() (Config, error) {
 		return c, err
 	}
 	c.CacheMiB = cache
+
+	c.Registration = strings.ToLower(strings.TrimSpace(env("REGISTRATION", "closed")))
+	switch c.Registration {
+	case "closed", "invite", "open":
+	default:
+		return c, fmt.Errorf("%sREGISTRATION must be closed, invite or open, got %q", envPrefix, c.Registration)
+	}
+	c.MailFrom = env("MAIL_FROM", "")
 
 	level, err := parseLevel(env("LOG_LEVEL", "info"))
 	if err != nil {

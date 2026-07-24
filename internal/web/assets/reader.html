@@ -40,6 +40,19 @@
 	<p class="invitation">Anyone can read here. <a href="/login">Sign in</a> to reply, save and follow.</p>
 	{{end}}
 
+	<nav class="views scopes" aria-label="Where the posts came from">
+		<a href="/" {{if not .Scope}}aria-current="page"{{end}}
+			data-tip="Everything this instance has read, from anywhere.">Everything</a>
+		<a href="/?scope=here" {{if eq .Scope "here"}}aria-current="page"{{end}}
+			data-tip="Written by people with an account on this instance.">Written here</a>
+		<a href="/?scope=elsewhere" {{if eq .Scope "elsewhere"}}aria-current="page"{{end}}
+			data-tip="Arrived from a feed somewhere else on the web.">From elsewhere</a>
+		{{if .Account}}
+		<a href="/?scope=mine" {{if eq .Scope "mine"}}aria-current="page"{{end}}
+			data-tip="Only what you published.">Yours</a>
+		{{end}}
+	</nav>
+
 	{{if .Account}}
 	<nav class="views" aria-label="Which posts to show">
 		<a href="/" {{if and (not .View) (not .Search)}}aria-current="page"{{end}}>Everything</a>

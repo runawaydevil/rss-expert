@@ -405,3 +405,47 @@ func (s *Store) withMedia(ctx context.Context, posts []*Post) []*Post {
 	}
 	return posts
 }
+
+func (s *Store) HandleFor(ctx context.Context, accountID int64) (string, error) {
+	var handle sql.NullString
+	err := s.db.Read.QueryRowContext(ctx,
+		`select handle from account where id = ?`, accountID).Scan(&handle)
+	if err != nil {
+		return "", err
+	}
+	if !handle.Valid || handle.String == "" {
+		return "", ErrNoPost
+	}
+	return handle.String, nil
+}
+
+type DraftText struct {
+	Title     string
+	Markdown  string
+	InReplyTo string
+}
+
+func (s *Store) SaveDraft(ctx context.Context, accountID int64, title, markdown, inReplyTo string) error {
+	_, err := s.db.Write.ExecContext(ctx,
+		`insert into draft (account_id, title, markdown, in_reply_to, saved_at)
+		 values (?, ?, ?, ?, ?)
+		 on conflict (account_id) do update set
+		   title = excluded.title, markdown = excluded.markdown,
+		   in_reply_to = excluded.in_reply_to, saved_at = excluded.saved_at`,
+		accountID, nullable(title), markdown, nullable(inReplyTo), time.Now().UTC().Unix())
+	return err
+}
+
+func (s *Store) Draft(ctx context.Context, accountID int64) (DraftText, error) {
+	var draft DraftText
+	err := s.db.Read.QueryRowContext(ctx,
+		`select coalesce(title, ''), markdown, coalesce(in_reply_to, '')
+		 from draft where account_id = ?`, accountID).
+		Scan(&draft.Title, &draft.Markdown, &draft.InReplyTo)
+	return draft, err
+}
+
+func (s *Store) DropDraft(ctx context.Context, accountID int64) error {
+	_, err := s.db.Write.ExecContext(ctx, `delete from draft where account_id = ?`, accountID)
+	return err
+}

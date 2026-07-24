@@ -8,14 +8,18 @@ import (
 	"github.com/runawaydevil/rss-expert/internal/identity"
 	"github.com/runawaydevil/rss-expert/internal/ingest"
 	"github.com/runawaydevil/rss-expert/internal/jobs"
+	"github.com/runawaydevil/rss-expert/internal/push"
+	"github.com/runawaydevil/rss-expert/internal/web"
 )
 
 const (
-	upkeepInterval  = 6 * time.Hour
+	upkeepInterval  = 1 * time.Hour
 	finishedJobsAge = 14 * 24 * time.Hour
 )
 
 type upkeep struct {
+	instance *web.App
+	push     *push.Store
 	accounts *identity.Store
 	sources  *ingest.Store
 	queue    *jobs.Queue
@@ -44,6 +48,12 @@ func (u upkeep) once(ctx context.Context) {
 		u.log.Info("purged expired sessions", "count", n)
 	}
 
+	if n, err := u.accounts.PurgeExpiredTokens(ctx, time.Now().UTC()); err != nil {
+		u.log.Warn("could not purge expired email tokens", "error", err)
+	} else if n > 0 {
+		u.log.Info("purged used and expired email tokens", "count", n)
+	}
+
 	if n, err := u.queue.PurgeDone(ctx, finishedJobsAge); err != nil {
 		u.log.Warn("could not purge finished jobs", "error", err)
 	} else if n > 0 {
@@ -54,5 +64,15 @@ func (u upkeep) once(ctx context.Context) {
 		u.log.Warn("could not purge stored payloads", "error", err)
 	} else if n > 0 {
 		u.log.Info("purged stored payloads past their retention", "count", n)
+	}
+
+	if n, err := u.push.ForgetExpired(ctx, time.Now().UTC()); err != nil {
+		u.log.Warn("could not forget expired subscribers", "error", err)
+	} else if n > 0 {
+		u.log.Info("forgot subscribers whose lease ran out", "count", n)
+	}
+
+	if n := u.instance.RenewPush(ctx); n > 0 {
+		u.log.Info("renewed push subscriptions", "count", n)
 	}
 }

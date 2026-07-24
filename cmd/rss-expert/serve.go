@@ -14,7 +14,9 @@ import (
 	"github.com/runawaydevil/rss-expert/internal/identity"
 	"github.com/runawaydevil/rss-expert/internal/ingest"
 	"github.com/runawaydevil/rss-expert/internal/jobs"
+	"github.com/runawaydevil/rss-expert/internal/mail"
 	"github.com/runawaydevil/rss-expert/internal/poller"
+	"github.com/runawaydevil/rss-expert/internal/push"
 	"github.com/runawaydevil/rss-expert/internal/store"
 	"github.com/runawaydevil/rss-expert/internal/web"
 )
@@ -54,6 +56,14 @@ func serve(ctx context.Context, args []string) error {
 		return err
 	}
 
+	mailer, err := mail.New(cfg.SMTPURL, cfg.MailFrom)
+	if err != nil && !errors.Is(err, mail.ErrNotConfigured) {
+		return err
+	}
+	if mailer == nil {
+		log.Warn("no mail server is configured; sign-in links and account confirmation are unavailable")
+	}
+
 	instance := web.New(db, log, "https://"+cfg.Domain, web.Options{
 		MediaRoot:    filepath.Join(cfg.DataDir, "media"),
 		MediaQuota:   cfg.MediaQuota,
@@ -63,6 +73,8 @@ func serve(ctx context.Context, args []string) error {
 		MetricsToken: cfg.MetricsToken,
 		FetchLimit:   cfg.FetchLimit,
 		DataDir:      cfg.DataDir,
+		Registration: cfg.Registration,
+		Mailer:       mailer,
 	})
 
 	app := &http.Server{
@@ -87,6 +99,8 @@ func serve(ctx context.Context, args []string) error {
 	upkeepCtx, stopUpkeep := context.WithCancel(ctx)
 	defer stopUpkeep()
 	go upkeep{
+		instance: instance,
+		push:     push.New(db),
 		accounts: accounts,
 		sources:  ingest.NewStore(db),
 		queue:    jobs.New(db),

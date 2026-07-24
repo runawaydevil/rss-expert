@@ -2,6 +2,7 @@ package web
 
 import (
 	"errors"
+	"html/template"
 	"net/http"
 	"strconv"
 
@@ -86,16 +87,34 @@ func (a *App) postPage(w http.ResponseWriter, r *http.Request) {
 		title = "A post by " + post.Handle
 	}
 
+	branches := a.thread(r.Context(), post.GUID, 0)
+	if account := accountFrom(r.Context()); account != nil {
+		if flags, err := a.reading.FlagsFor(r.Context(), account.ID, flatten(branches, nil)); err == nil {
+			decorateThread(branches, flags)
+		}
+	}
+
 	a.render(w, r, "post.html", map[string]any{
 		"Title":      title + " — RSS Expert",
 		"Post":       localView(post),
 		"Replies":    localViews(replies),
+		"Thread":     branches,
 		"RepliesURL": a.posts.RepliesURL(post.ID),
 	})
 }
 
 func (a *App) writeForm(w http.ResponseWriter, r *http.Request) {
-	a.renderWrite(w, r, r.URL.Query().Get("to"), "", "", "")
+	inReplyTo := r.URL.Query().Get("to")
+	title, source := "", ""
+
+	if account := accountFrom(r.Context()); account != nil {
+		if draft, err := a.posts.Draft(r.Context(), account.ID); err == nil {
+			if inReplyTo == "" || draft.InReplyTo == inReplyTo {
+				title, source, inReplyTo = draft.Title, draft.Markdown, draft.InReplyTo
+			}
+		}
+	}
+	a.renderWrite(w, r, inReplyTo, title, source, "")
 }
 
 func (a *App) submitWrite(w http.ResponseWriter, r *http.Request) {
@@ -103,6 +122,11 @@ func (a *App) submitWrite(w http.ResponseWriter, r *http.Request) {
 
 	if err := r.ParseForm(); err != nil {
 		a.renderWrite(w, r, "", "", "", "That form could not be read.")
+		return
+	}
+
+	if r.PostFormValue("preview") != "" {
+		a.previewWrite(w, r)
 		return
 	}
 	if !validCSRF(r) {
@@ -130,12 +154,39 @@ func (a *App) submitWrite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.attachToPost(r.Context(), post.ID, r.PostForm["media"])
+	a.posts.DropDraft(r.Context(), account.ID)
 
 	a.log.Info("published", "post", post.ID, "account", account.Email, "reply", post.InReplyTo != "")
 	http.Redirect(w, r, "/p/"+strconv.FormatInt(post.ID, 10), http.StatusSeeOther)
 }
 
+func (a *App) previewWrite(w http.ResponseWriter, r *http.Request) {
+	account := accountFrom(r.Context())
+
+	title := r.PostFormValue("title")
+	source := r.PostFormValue("markdown")
+	inReplyTo := r.PostFormValue("in_reply_to")
+
+	if err := a.posts.SaveDraft(r.Context(), account.ID, title, source, inReplyTo); err != nil {
+		a.log.Error("could not keep a draft", "error", err)
+	}
+
+	rendered, err := publish.Render(source)
+	if err != nil {
+		a.renderWrite(w, r, inReplyTo, title, source, "That Markdown could not be rendered.")
+		return
+	}
+
+	data := a.writeData(r, inReplyTo, title, source, "")
+	data["Preview"] = template.HTML(rendered)
+	a.render(w, r, "write.html", data)
+}
+
 func (a *App) renderWrite(w http.ResponseWriter, r *http.Request, inReplyTo, title, source, problem string) {
+	a.render(w, r, "write.html", a.writeData(r, inReplyTo, title, source, problem))
+}
+
+func (a *App) writeData(r *http.Request, inReplyTo, title, source, problem string) map[string]any {
 	data := map[string]any{
 		"Title":     "Write — RSS Expert",
 		"InReplyTo": inReplyTo,
@@ -155,5 +206,5 @@ func (a *App) renderWrite(w http.ResponseWriter, r *http.Request, inReplyTo, tit
 			data["Parent"] = localView(parent)
 		}
 	}
-	a.render(w, r, "write.html", data)
+	return data
 }

@@ -78,7 +78,9 @@ which wins over both:
   RSS_EXPERT_ADMIN_LISTEN   admin address              (default 127.0.0.1:11090)
   RSS_EXPERT_DATA_DIR       database and attachments   (default data)
   RSS_EXPERT_ENV_FILE       read this file instead of the two above
-  RSS_EXPERT_SMTP_URL       outgoing mail
+  RSS_EXPERT_SMTP_URL       mail server for links and confirmation
+  RSS_EXPERT_MAIL_FROM      the From address on those messages
+  RSS_EXPERT_REGISTRATION   closed, invite or open      (default closed)
   RSS_EXPERT_ADMIN_EMAIL    owner account, created on first boot only
   RSS_EXPERT_ADMIN_PASSWORD owner password, hashed at once and never stored
   RSS_EXPERT_BEHIND_PROXY   trust X-Forwarded-* headers (default false)

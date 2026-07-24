@@ -10,11 +10,19 @@ import (
 
 func openTemp(t *testing.T) *DB {
 	t.Helper()
-	db, err := Open(context.Background(), filepath.Join(t.TempDir(), "test.db"))
+	dir, err := os.MkdirTemp("", "rss-expert-store")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { db.Close() })
+	db, err := Open(context.Background(), filepath.Join(dir, "test.db"))
+	if err != nil {
+		os.RemoveAll(dir)
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		db.Close()
+		os.RemoveAll(dir)
+	})
 	return db
 }
 

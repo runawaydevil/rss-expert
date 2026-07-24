@@ -21,6 +21,7 @@ import (
 )
 
 type instance struct {
+	app      *web.App
 	t        *testing.T
 	db       *store.DB
 	domain   string
@@ -72,14 +73,15 @@ func newInstance(t *testing.T, domain string) *instance {
 
 	server := httptest.NewUnstartedServer(nil)
 	base := "http://" + server.Listener.Addr().String()
-	server.Config.Handler = web.NewApp(db, quiet, base).Handler()
+	app := web.New(db, quiet, base, web.Options{ShowPreview: true, ReachPrivate: true})
+	server.Config.Handler = app.Handler()
 	server.Start()
 	t.Cleanup(server.Close)
 
 	posts = publish.NewStore(db, base)
 
 	return &instance{
-		t: t, domain: domain, server: server, db: db,
+		t: t, domain: domain, server: server, db: db, app: app,
 		accounts: accounts, posts: posts, sources: sources,
 		poller: poller.New(sources, quiet, poller.Options{AllowPrivateAddrs: true}),
 		owner:  owner, handle: handle,

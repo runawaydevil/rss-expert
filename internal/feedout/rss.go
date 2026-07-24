@@ -19,12 +19,16 @@ type Cloud struct {
 type RSSOptions struct {
 	Generator string
 	Docs      string
+	Hub       string
 	Cloud     *Cloud
 	BuildTime time.Time
 }
 
 func RSS(f *feed.Feed, o RSSOptions) []byte {
 	ns := collectNamespaces(f)
+	if o.Hub != "" || f.Self != "" {
+		ns.use(feed.NSAtom)
+	}
 	w := &writer{}
 	w.buf.WriteString(xml.Header)
 
@@ -49,6 +53,17 @@ func writeChannel(w *writer, ns *namespaces, f *feed.Feed, o RSSOptions) {
 	w.optional("lastBuildDate", rfc822(o.BuildTime))
 	w.optional("generator", o.Generator)
 	w.optional("docs", o.Docs)
+
+	if atom := ns.byURI[feed.NSAtom]; atom != "" {
+		if o.Hub != "" {
+			w.leaf(atom+":link", "", attr{"rel", "hub"}, attr{"href", o.Hub})
+		}
+		if f.Self != "" {
+			w.leaf(atom+":link", "",
+				attr{"rel", "self"}, attr{"href", f.Self},
+				attr{"type", "application/rss+xml"})
+		}
+	}
 
 	if c := o.Cloud; c != nil {
 		w.leaf("cloud", "",

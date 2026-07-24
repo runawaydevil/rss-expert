@@ -9,7 +9,6 @@
 
 	<main id="form">
 		<form class="panel form panel-narrow" method="post" action="/login">
-			<img class="form-logo" src="{{asset "logo.png"}}" alt="" width="352" height="320" decoding="async">
 			<h1>Sign in</h1>
 
 			{{if .Problem}}
@@ -28,6 +27,8 @@
 			<button type="submit" class="button-primary">Sign in</button>
 
 			<p class="form-aside">Reading needs no account. Sign in to reply, save and follow.</p>
+			<p class="form-aside"><a href="/account/forgot">Sign in by email</a> ·
+			<a href="/register">Create an account</a></p>
 		</form>
 	</main>
 </div>

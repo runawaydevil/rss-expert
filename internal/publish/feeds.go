@@ -2,6 +2,8 @@ package publish
 
 import (
 	"context"
+	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/runawaydevil/rss-expert/internal/feed"
@@ -11,11 +13,38 @@ import (
 const FeedItemLimit = 100
 
 func (s *Store) emitOptions(now time.Time) feedout.RSSOptions {
-	return feedout.RSSOptions{
+	o := feedout.RSSOptions{
 		Generator: "rss-expert",
 		Docs:      "https://www.rssboard.org/rss-specification",
 		BuildTime: now,
+		Hub:       s.baseURL() + "/websub/hub",
 	}
+	if host, port := s.cloudHost(); host != "" {
+		o.Cloud = &feedout.Cloud{
+			Domain:   host,
+			Port:     port,
+			Path:     "/rsscloud/pleaseNotify",
+			Protocol: "http-post",
+		}
+	}
+	return o
+}
+
+func (s *Store) cloudHost() (string, int) {
+	parsed, err := url.Parse(s.baseURL())
+	if err != nil || parsed.Hostname() == "" {
+		return "", 0
+	}
+	port := 443
+	if parsed.Scheme == "http" {
+		port = 80
+	}
+	if explicit := parsed.Port(); explicit != "" {
+		if n, err := strconv.Atoi(explicit); err == nil {
+			port = n
+		}
+	}
+	return parsed.Hostname(), port
 }
 
 func (s *Store) item(post *Post) feed.Item {
