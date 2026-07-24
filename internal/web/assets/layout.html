@@ -1,0 +1,66 @@
+{{define "head"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}}</title>
+<link rel="icon" href="{{asset "favicon.ico"}}" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="{{asset "favicon.png"}}">
+<link rel="apple-touch-icon" href="{{asset "mark.png"}}">
+<link rel="webmention" href="/webmention">
+<link rel="micropub" href="/micropub">
+<link rel="stylesheet" href="{{asset "tokens.css"}}">
+<link rel="stylesheet" href="{{asset "app.css"}}">
+</head>
+{{end}}
+
+{{define "colophon"}}
+<footer class="colophon">
+	<p>Colour and shape follow the <a href="https://github.com/cornetespoir/page-faq">Starlight
+	and Sunset</a> pages by <a href="https://egg.design/">egg.design</a>. Their code is not used
+	here; the stylesheet is ours, the feeling is theirs.</p>
+	<p><a href="/rules">How this instance works</a> — what is kept, what is not done, and who to
+	write to.</p>
+	<p>Icons are <a href="https://github.com/halfmage/pixelarticons">Pixelarticons</a> by Gerrit
+	Halfmann (MIT). Type is Fraunces, Atkinson Hyperlegible and JetBrains Mono, all open licensed
+	and served from this instance.</p>
+	<p><a href="https://github.com/runawaydevil/rss-expert">rss&#8202;expert</a> was written by
+	Pablo Murad and is free software under the AGPL-3.0.</p>
+</footer>
+{{end}}
+
+{{define "attachments"}}
+{{if .Attachments}}
+<ul class="attachments">
+	{{range .Attachments}}
+	<li>
+		{{if .IsImage}}
+		<img src="{{.URL}}" alt="{{.Alt}}" loading="lazy"
+			{{if .Width}}width="{{.Width}}" height="{{.Height}}"{{end}}>
+		{{else if .IsAudio}}
+		<audio controls preload="none" src="{{.URL}}">
+			<a href="{{.URL}}">Download the audio</a>
+		</audio>
+		{{else if .IsVideo}}
+		<video controls preload="none" src="{{.URL}}" playsinline>
+			<a href="{{.URL}}">Download the video</a>
+		</video>
+		{{end}}
+		{{if .Alt}}<p class="attachment-alt">{{.Alt}}</p>{{end}}
+	</li>
+	{{end}}
+</ul>
+{{end}}
+{{if .Elsewhere}}
+<ul class="attachments offsite">
+	{{range .Elsewhere}}
+	<li>
+		<a href="{{.URL}}" rel="noopener"
+			data-tip="This file sits on the other site. Nothing is fetched until you open it, so until then that site does not know you are here.">
+			Open the {{.Kind}}{{if .Size}} · {{.Size}}{{end}}</a>
+		<p class="attachment-alt">{{.Type}}, hosted by the source</p>
+	</li>
+	{{end}}
+</ul>
+{{end}}
+{{end}}

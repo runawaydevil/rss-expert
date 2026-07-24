@@ -9,7 +9,7 @@ import (
 
 	"github.com/mmcdole/gofeed"
 
-	"github.com/runawaydevil/rss-social/internal/feed"
+	"github.com/runawaydevil/rss-expert/internal/feed"
 )
 
 var byteOrderMark = []byte{0xEF, 0xBB, 0xBF}

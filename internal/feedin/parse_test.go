@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/runawaydevil/rss-social/internal/feed"
+	"github.com/runawaydevil/rss-expert/internal/feed"
 )
 
 func load(t *testing.T, name string) []byte {

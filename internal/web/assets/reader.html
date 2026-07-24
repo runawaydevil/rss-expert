@@ -1,0 +1,127 @@
+{{template "head" .}}
+<body>
+<a class="skip" href="#reader">Skip to the posts</a>
+
+<div class="page">
+	<header class="masthead">
+		<a class="wordmark" href="/"><img src="{{asset "mark.png"}}" alt="" width="40" height="40" decoding="async"> rss&#8202;expert</a>
+
+		{{if .Account}}
+		<a class="button-primary" href="/write">Write</a>
+		<details class="menu">
+			<summary title="Your account">
+				<span class="avatar avatar-sm" aria-hidden="true">{{.Account.Initial}}</span>
+				<span class="sr-only">Your account</span>
+			</summary>
+			<div class="menu-body">
+				<p class="menu-who">
+					{{.Account.Email}}<br>
+					<span class="menu-role">{{.Account.Role}}</span>
+				</p>
+				<a href="/sources">{{icon "rss"}} Sources</a>
+				<a href="/saved">{{icon "bookmark"}} Saved</a>
+				<a href="/conversations">{{icon "comment"}} Conversations</a>
+				<a href="/settings">{{icon "book-open"}} Settings</a>
+				{{if .Account.Role.CanAdminister}}
+				<a href="/admin">{{icon "check"}} Administration</a>
+				{{end}}
+				<form method="post" action="/logout">
+					<input type="hidden" name="csrf" value="{{.CSRF}}">
+					<button type="submit">Sign out</button>
+				</form>
+			</div>
+		</details>
+		{{else}}
+		<a class="button-primary" href="/login">Log in</a>
+		{{end}}
+	</header>
+
+	{{if not .Account}}
+	<p class="invitation">Anyone can read here. <a href="/login">Sign in</a> to reply, save and follow.</p>
+	{{end}}
+
+	{{if .Account}}
+	<nav class="views" aria-label="Which posts to show">
+		<a href="/" {{if and (not .View) (not .Search)}}aria-current="page"{{end}}>Everything</a>
+		<a href="/?view=unread" {{if eq .View "unread"}}aria-current="page"{{end}}>Unread{{if .Unread}} <span class="count">{{.Unread}}</span>{{end}}</a>
+		<a href="/?view=saved" {{if eq .View "saved"}}aria-current="page"{{end}}>Saved{{if .Saved}} <span class="count">{{.Saved}}</span>{{end}}</a>
+		<a href="/sources">Sources</a>
+		{{range .Collections}}<a href="/?collection={{.ID}}">{{.Name}}</a>{{end}}
+	</nav>
+	{{end}}
+
+	<form class="search" method="get" action="/" role="search">
+		<label for="q" class="sr-only">Search everything this instance has read</label>
+		<input id="q" name="q" type="search" value="{{.Search}}" placeholder="Search"
+			data-tip="Searches the text of everything this instance has read, not the web.">
+		<button type="submit">{{icon "search"}} <span class="sr-only">Search</span></button>
+	</form>
+
+	{{if .Label}}<p class="view-label">{{.Label}}</p>{{end}}
+
+	<main class="reader" id="reader">
+		{{range .Posts}}
+		<article class="post{{if .Read}} post-read{{end}}">
+			<header class="post-head">
+				<span class="avatar" aria-hidden="true">{{.Initial}}</span>
+				<span class="who">{{.Author}}</span>
+				<a class="site" href="{{.SiteURL}}"
+					data-tip="The domain this came from. On the open web the domain is the identity.">{{.Site}}</a>
+				<time class="when" datetime="{{.PublishedISO}}">{{.Age}}</time>
+			</header>
+
+			{{if .Title}}
+			<h2><a href="{{.URL}}">{{.Title}}</a></h2>
+			{{end}}
+
+			{{if .QuotedAuthor}}
+			<blockquote class="quoted">
+				<cite>{{.QuotedAuthor}}</cite>
+				{{.QuotedText}}
+			</blockquote>
+			{{end}}
+
+			<div class="prose">{{.HTML}}</div>
+
+			{{template "attachments" .}}
+
+			<footer class="post-foot">
+				{{if $.Account}}
+				<form method="post" action="/mark" class="inline">
+					<input type="hidden" name="csrf" value="{{$.CSRF}}">
+					<input type="hidden" name="key" value="{{.Key}}">
+					<input type="hidden" name="back" value="/{{if $.View}}?view={{$.View}}{{end}}">
+					{{if .Read}}
+					<input type="hidden" name="action" value="unread">
+					<button type="submit" data-tip="Put it back in the unread list.">{{icon "check"}} Read</button>
+					{{else}}
+					<input type="hidden" name="action" value="read">
+					<button type="submit" data-tip="Mark this as read. Only you see this.">{{icon "check"}} Mark read</button>
+					{{end}}
+				</form>
+				<form method="post" action="/mark" class="inline">
+					<input type="hidden" name="csrf" value="{{$.CSRF}}">
+					<input type="hidden" name="key" value="{{.Key}}">
+					<input type="hidden" name="back" value="/{{if $.View}}?view={{$.View}}{{end}}">
+					<input type="hidden" name="action" value="{{if .Saved}}unsave{{else}}save{{end}}">
+					<button type="submit" data-tip="Keeps a copy here, even if the source edits or deletes it.">{{icon "bookmark"}} {{if .Saved}}Saved{{else}}Save{{end}}</button>
+				</form>
+				<a href="/reply?to={{.URL}}"
+					aria-label="Reply. Your reply is published in your own feed; their site reads it back from there."
+					data-tip="Your reply is published in your own feed. Their site reads it back from there.">{{icon "comment"}} Reply</a>
+				{{end}}
+				<a href="{{.URL}}"
+					aria-label="Source. Opens the original page on their own site."
+					data-tip="Opens the original page on their own site.">{{icon "external-link"}} Source</a>
+				<span class="via" title="{{.ArrivalTip}}">{{.Arrival}}</span>
+			</footer>
+		</article>
+		{{else}}
+		<p class="empty">Nothing here yet. This instance has not read any feeds.</p>
+		{{end}}
+	</main>
+</div>
+
+{{template "colophon" .}}
+</body>
+</html>

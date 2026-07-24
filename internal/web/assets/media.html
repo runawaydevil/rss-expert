@@ -1,0 +1,87 @@
+{{template "head" .}}
+<body>
+<a class="skip" href="#library">Skip to your files</a>
+
+<div class="page">
+	<header class="masthead">
+		<a class="wordmark" href="/"><img src="{{asset "mark.png"}}" alt="" width="40" height="40" decoding="async"> rss&#8202;expert</a>
+		<a class="button-primary" href="/write">Write</a>
+	</header>
+
+	<main id="library">
+		<h1>Your files</h1>
+		<p class="lead">Images and audio you attach to posts. Anything you upload travels out in
+		your feed as an enclosure, so podcast apps and other readers can find it.</p>
+
+		{{if .Problem}}
+		<p class="form-problem" role="alert">{{.Problem}}</p>
+		{{end}}
+
+		<section class="block">
+			<h2>Room</h2>
+			<div class="quota" role="img"
+				aria-label="{{printf "%.1f" .UsedMiB}} of {{printf "%.0f" .QuotaMiB}} MiB used">
+				<span style="width: {{.Percent}}%"></span>
+			</div>
+			<p class="note">{{printf "%.1f" .UsedMiB}} MiB of {{printf "%.0f" .QuotaMiB}} MiB used.</p>
+		</section>
+
+		<section class="block">
+			<h2>Upload</h2>
+			<form class="panel form" method="post" action="/settings/media" enctype="multipart/form-data">
+				<input type="hidden" name="csrf" value="{{.CSRF}}">
+
+				<label for="file">A file <span class="optional">images, audio or video</span></label>
+				<input id="file" name="file" type="file" required
+					accept="image/jpeg,image/png,image/gif,image/webp,audio/*,video/mp4,video/webm">
+
+				<label for="alt">Description <span class="optional">what is in it, for people who cannot see it</span></label>
+				<input id="alt" name="alt" type="text" maxlength="400">
+
+				<button type="submit" class="button-primary">Upload</button>
+
+				<p class="form-aside">Location and camera data are removed from photographs before
+				anything is stored. The pixels are untouched — nothing is re-compressed.</p>
+			</form>
+		</section>
+
+		{{if .Files}}
+		<section class="block">
+			<h2>Uploaded</h2>
+			<ul class="gallery">
+				{{range .Files}}
+				<li class="gallery-item">
+					{{if .IsImage}}
+					<a href="{{.URL}}"><img src="{{.URL}}" alt="{{.Alt}}" loading="lazy"
+						{{if .Width}}width="{{.Width}}" height="{{.Height}}"{{end}}></a>
+					{{else if .IsAudio}}
+					<audio controls preload="none" src="{{.URL}}">
+						<a href="{{.URL}}">Download the audio</a>
+					</audio>
+					{{else if .IsVideo}}
+					<video controls preload="none" src="{{.URL}}" playsinline>
+						<a href="{{.URL}}">Download the video</a>
+					</video>
+					{{end}}
+
+					<p class="gallery-meta">
+						<span class="gallery-name">{{if .Name}}{{.Name}}{{else}}{{.MediaType}}{{end}}</span>
+						{{if .Stripped}}<span class="gallery-clean"
+							data-tip="Location and camera metadata were removed before this was stored.">metadata removed</span>{{end}}
+					</p>
+					{{if not .Alt}}
+					{{if .IsImage}}
+					<p class="gallery-warn">No description. Screen readers will announce nothing.</p>
+					{{end}}
+					{{end}}
+				</li>
+				{{end}}
+			</ul>
+		</section>
+		{{end}}
+	</main>
+</div>
+
+{{template "colophon" .}}
+</body>
+</html>

@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/runawaydevil/rss-social/internal/feed"
+	"github.com/runawaydevil/rss-expert/internal/feed"
 )
 
 type Cloud struct {

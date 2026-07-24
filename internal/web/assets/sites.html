@@ -1,0 +1,97 @@
+{{template "head" .}}
+<body>
+<a class="skip" href="#sites">Skip to your sites</a>
+
+<div class="page">
+	<header class="masthead">
+		<a class="wordmark" href="/"><img src="{{asset "mark.png"}}" alt="" width="40" height="40" decoding="async"> rss&#8202;expert</a>
+		<a class="button-primary" href="/">Back to reading</a>
+	</header>
+
+	<main id="sites">
+		<h1>Your sites</h1>
+		<p class="lead">On the open web your domain is your identity — stronger than any name or
+		avatar, because you are the only one who can put a file on it. Claim a domain here and
+		prove it is yours.</p>
+
+		{{if .Problem}}
+		<p class="form-problem" role="alert">{{.Problem}}</p>
+		{{end}}
+
+		<section class="block">
+			<h2>How proving it works</h2>
+			<p class="lead">Put this link anywhere on your site's home page:</p>
+			<pre class="snippet">&lt;link rel="me" href="{{.ProfileURL}}"&gt;</pre>
+			<p class="lead">Then press Verify. We read your page and look for that link. Your
+			profile here already carries a <code>rel="me"</code> pointing back at your domain, so
+			the two ends confirm each other. Neither side alone is enough — that is the whole
+			point.</p>
+			<p class="note">While we are there we also read your <code>h-card</code> for a name and
+			a short note, and any feed you advertise. Nothing is required; whatever is missing just
+			stays empty.</p>
+		</section>
+
+		<section class="block">
+			<h2>Claim a domain</h2>
+			<form class="panel form" method="post" action="/settings/sites/claim">
+				<input type="hidden" name="csrf" value="{{.CSRF}}">
+				<label for="url">Your site</label>
+				<input id="url" name="url" type="text" required placeholder="example.org"
+					autocomplete="url" spellcheck="false">
+				<button type="submit" class="button-primary">Claim it</button>
+			</form>
+		</section>
+
+		{{if .Sites}}
+		<section class="block">
+			<h2>Claimed</h2>
+			<ul class="claims">
+				{{range .Sites}}
+				<li class="claim claim-{{.State}}">
+					<div class="claim-head">
+						<span class="claim-state">{{.State}}</span>
+						<a class="claim-host" href="{{.URL}}">{{.Host}}</a>
+					</div>
+
+					{{if .Verified}}
+					<p class="claim-detail">Verified. This domain and your profile link to each
+					other.{{if .Name}} Reading as <strong>{{.Name}}</strong>.{{end}}</p>
+					{{else if .LastError}}
+					<p class="claim-detail">{{.LastError}}</p>
+					{{else}}
+					<p class="claim-detail">Claimed but unverified. Add the link above, then press
+					Verify. Until then this is only a claim and is shown as one.</p>
+					{{end}}
+
+					<div class="claim-actions">
+						<form method="post" action="/settings/sites/verify" class="inline">
+							<input type="hidden" name="csrf" value="{{$.CSRF}}">
+							<input type="hidden" name="site" value="{{.ID}}">
+							<button type="submit"
+								data-tip="Reads your site now and looks for the link back.">{{if .Verified}}Check again{{else}}Verify{{end}}</button>
+						</form>
+						<form method="post" action="/settings/sites/release" class="inline">
+							<input type="hidden" name="csrf" value="{{$.CSRF}}">
+							<input type="hidden" name="site" value="{{.ID}}">
+							<button type="submit"
+								data-tip="Gives the domain up. Anyone else can claim it afterwards.">Release</button>
+						</form>
+					</div>
+				</li>
+				{{end}}
+			</ul>
+		</section>
+		{{end}}
+
+		<section class="block">
+			<h2>Your profile here</h2>
+			<p class="lead"><a href="/users/{{.Handle}}">{{.ProfileURL}}</a> — this is what you
+			point <code>rel="me"</code> at, and what other sites will link to when they mention
+			you.</p>
+		</section>
+	</main>
+</div>
+
+{{template "colophon" .}}
+</body>
+</html>

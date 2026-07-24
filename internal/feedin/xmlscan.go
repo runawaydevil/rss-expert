@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/net/html/charset"
 
-	"github.com/runawaydevil/rss-social/internal/feed"
+	"github.com/runawaydevil/rss-expert/internal/feed"
 )
 
 var errNoRootElement = errors.New("feedin: document has no root element")

@@ -1,0 +1,65 @@
+{{template "head" .}}
+<body>
+<a class="skip" href="#sources">Skip to the sources</a>
+
+<div class="page">
+	<header class="masthead">
+		<a class="wordmark" href="/"><img src="{{asset "mark.png"}}" alt="" width="40" height="40" decoding="async"> rss&#8202;expert</a>
+		{{if .Account}}
+		<a class="button-primary" href="/write">Write</a>
+		{{else}}
+		<a class="button-primary" href="/login">Log in</a>
+		{{end}}
+	</header>
+
+	<main id="sources">
+		<h1>Sources</h1>
+		<p class="lead">Every feed this instance reads. Health is shown here because a feed that
+		dies quietly is the main way a reader lies to you.</p>
+
+		{{if .Sources}}
+		<ul class="source-list">
+			{{range .Sources}}
+			<li class="source source-{{.State}}">
+				<div class="source-head">
+					<span class="source-mark">{{.State}}</span>
+					<a class="source-title" href="{{if .SiteURL}}{{.SiteURL}}{{else}}{{.FeedURL}}{{end}}">
+						{{if .Title}}{{.Title}}{{else}}{{.FeedURL}}{{end}}</a>
+					<span class="source-when">read {{.LastRead}}</span>
+				</div>
+				<p class="source-feed">{{.FeedURL}}</p>
+				{{if .Detail}}
+				<p class="source-detail">{{.Detail}}
+					{{if .Action}}<a href="/sources">{{.Action}}</a>{{end}}</p>
+				{{else}}
+				<p class="source-detail">Read every {{.Every}}.</p>
+				{{end}}
+			</li>
+			{{end}}
+		</ul>
+		{{else}}
+		<p class="empty">This instance follows nothing yet. Add a feed with
+		<code>rss-expert sources add &lt;url&gt;</code>, or import an outline below.</p>
+		{{end}}
+
+		<section class="block">
+			<h2>Take it with you</h2>
+			<p class="lead">Your subscriptions are yours. Export them as OPML and any other reader
+			will accept the file.</p>
+			<p><a class="button-primary inline-button" href="/subscriptions.opml">{{icon "rss"}} Export OPML</a></p>
+
+			{{if .Account}}
+			<form class="panel form" method="post" action="/subscriptions.opml" enctype="multipart/form-data">
+				<input type="hidden" name="csrf" value="{{.CSRF}}">
+				<label for="outline">Import an outline <span class="optional">folders are read, feeds are added</span></label>
+				<input id="outline" name="outline" type="file" accept=".opml,.xml,text/xml,text/x-opml" required>
+				<button type="submit" class="button-primary">Import</button>
+			</form>
+			{{end}}
+		</section>
+	</main>
+</div>
+
+{{template "colophon" .}}
+</body>
+</html>

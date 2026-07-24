@@ -1,0 +1,82 @@
+{{template "head" .}}
+<body>
+<a class="skip" href="#tokens">Skip to your app passwords</a>
+
+<div class="page">
+	<header class="masthead">
+		<a class="wordmark" href="/"><img src="{{asset "mark.png"}}" alt="" width="40" height="40" decoding="async"> rss&#8202;expert</a>
+		<a class="button-primary" href="/write">Write</a>
+	</header>
+
+	<main id="tokens">
+		<h1>App passwords</h1>
+		<p class="lead">Another app can post here on your behalf over Micropub — a phone client, a
+		script, a static site generator. Each one gets its own password, so you can take one away
+		without touching the rest.</p>
+
+		{{if .Problem}}
+		<p class="form-problem" role="alert">{{.Problem}}</p>
+		{{end}}
+
+		{{if .Fresh}}
+		<section class="block">
+			<h2>Your new app password</h2>
+			<p class="panel token-fresh"><code>{{.Fresh}}</code></p>
+			<p class="note">Copy it now. It is not stored in a form that can be shown again — only a
+			hash of it is kept, so nobody reading the database can use it.</p>
+		</section>
+		{{end}}
+
+		<section class="block">
+			<h2>Issue one</h2>
+			<form class="panel form" method="post" action="/settings/tokens">
+				<input type="hidden" name="csrf" value="{{.CSRF}}">
+
+				<label for="client">Which app <span class="optional">a name you will recognise later</span></label>
+				<input id="client" name="client" type="text" required maxlength="200" autocomplete="off">
+
+				<fieldset class="attach">
+					<legend>What it may do</legend>
+					{{range .Scopes}}
+					<label class="attach-choice">
+						<input type="checkbox" name="scope" value="{{.}}"{{if eq . "create"}} checked{{end}}>
+						<span>{{.}}</span>
+					</label>
+					{{end}}
+				</fieldset>
+
+				<button type="submit" class="button-primary">Issue</button>
+
+				<p class="form-aside">The endpoint is <code>/micropub</code>, and files go to
+				<code>/micropub/media</code>. Both are advertised in your pages already.</p>
+			</form>
+		</section>
+
+		{{if .Tokens}}
+		<section class="block">
+			<h2>In use</h2>
+			<ul class="token-list">
+				{{range .Tokens}}
+				<li class="panel token">
+					<div>
+						<strong>{{.ClientID}}</strong>
+						<p class="note">{{.Scope}}</p>
+						<p class="note">issued {{.CreatedAt.Format "2006-01-02"}}{{if not .LastUsed.IsZero}} · last used {{.LastUsed.Format "2006-01-02"}}{{else}} · never used{{end}}</p>
+					</div>
+					<form method="post" action="/settings/tokens/revoke">
+						<input type="hidden" name="csrf" value="{{$.CSRF}}">
+						<input type="hidden" name="token" value="{{.ID}}">
+						<button type="submit" class="button-quiet"
+							data-tip="The app stops being able to post the moment you do this. Nothing it already published is touched.">Revoke</button>
+					</form>
+				</li>
+				{{end}}
+			</ul>
+		</section>
+		{{end}}
+	</main>
+</div>
+
+{{template "colophon" .}}
+</body>
+</html>

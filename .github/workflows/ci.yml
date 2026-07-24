@@ -44,3 +44,4 @@ jobs:
           go test -run=XXX -fuzz=FuzzCheckAddr -fuzztime=30s ./internal/safety/
           go test -run=XXX -fuzz=FuzzCheckURL -fuzztime=30s ./internal/safety/
           go test -run=XXX -fuzz=FuzzParse -fuzztime=30s ./internal/feedin/
+          go test -run=XXX -fuzz=FuzzResolveIsTotal -fuzztime=30s ./internal/convergence/

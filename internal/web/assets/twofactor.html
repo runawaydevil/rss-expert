@@ -1,0 +1,73 @@
+{{template "head" .}}
+<body>
+<a class="skip" href="#form">Skip to the form</a>
+
+<div class="page">
+	<header class="masthead">
+		<a class="wordmark" href="/"><img src="{{asset "mark.png"}}" alt="" width="40" height="40" decoding="async"> rss&#8202;expert</a>
+		<a class="button-primary" href="/">Back to reading</a>
+	</header>
+
+	<main id="form">
+		<h1>Two-factor</h1>
+
+		{{if .Codes}}
+		<section class="block">
+			<p class="form-lead">Two-factor is on. Write these recovery codes down somewhere that
+			is not this computer. <strong>They are shown once.</strong> Each one works a single
+			time, and they are the only way back in if you lose the authenticator.</p>
+			<ul class="recovery">
+				{{range .Codes}}<li>{{.}}</li>{{end}}
+			</ul>
+		</section>
+
+		{{else if .Enabled}}
+		<section class="block">
+			<p class="form-lead">Two-factor is on for this account. {{.CodesLeft}} recovery
+			{{if eq .CodesLeft 1}}code{{else}}codes{{end}} left.</p>
+			{{if not .Required}}
+			<form method="post" action="/settings/two-factor/off">
+				<input type="hidden" name="csrf" value="{{.CSRF}}">
+				<button type="submit">Turn it off</button>
+			</form>
+			{{else}}
+			<p class="note">Your account administers this instance, so two-factor cannot be
+			switched off. That is deliberate.</p>
+			{{end}}
+		</section>
+
+		{{else}}
+		<section class="block">
+			{{if .Required}}
+			<p class="form-lead">Your account administers this instance. Two-factor is
+			<strong>required</strong>: a stolen password should not be enough to reach the
+			administration panel.</p>
+			{{else}}
+			<p class="form-lead">Add a second step to signing in. You will need an authenticator
+			app that supports TOTP.</p>
+			{{end}}
+
+			<p class="note">Add this secret to your authenticator by hand, or open the link if your
+			app accepts one. Nothing is sent anywhere: the secret is generated here and stays here.</p>
+
+			<p class="secret">{{.Secret}}</p>
+			<p class="note"><a href="{{.URI}}">Open in an authenticator app</a></p>
+
+			<form class="panel form" method="post" action="/settings/two-factor">
+				{{if .Problem}}
+				<p class="form-problem" role="alert">{{.Problem}}</p>
+				{{end}}
+				<input type="hidden" name="csrf" value="{{.CSRF}}">
+				<label for="code">The six digits your app shows now</label>
+				<input id="code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code"
+					pattern="[0-9 ]*" maxlength="9" required autofocus>
+				<button type="submit" class="button-primary">Turn it on</button>
+			</form>
+		</section>
+		{{end}}
+	</main>
+</div>
+
+{{template "colophon" .}}
+</body>
+</html>

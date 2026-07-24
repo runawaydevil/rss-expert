@@ -1,6 +1,6 @@
 services:
-  rss-social:
-    image: ghcr.io/runawaydevil/rss-social:0.0.1
+  rss-expert:
+    image: ghcr.io/runawaydevil/rss-expert:0.0.1
     build: .
     restart: unless-stopped
     read_only: true
@@ -8,11 +8,17 @@ services:
     security_opt:
       - no-new-privileges:true
     mem_limit: 512m
+    # The port on the host comes from .env, so a stray process on the usual one
+    # does not stop the container from starting. Inside, it is always 11080.
     ports:
-      - "11080:11080"
+      - "${RSS_EXPERT_HTTP_PORT:-11081}:11080"
     volumes:
       - ./data:/data
+    env_file:
+      - .env
     environment:
-      RSS_SOCIAL_DOMAIN: example.org
-      RSS_SOCIAL_SMTP_URL: ""
+      # Inside the container the data volume is mounted at /data, whatever the
+      # host path in .env says.
+      RSS_EXPERT_DATA_DIR: /data
+      RSS_EXPERT_LISTEN: :11080
       GOMEMLIMIT: 400MiB

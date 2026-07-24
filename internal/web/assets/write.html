@@ -1,0 +1,64 @@
+{{template "head" .}}
+<body>
+<a class="skip" href="#form">Skip to the form</a>
+
+<div class="page">
+	<header class="masthead">
+		<a class="wordmark" href="/"><img src="{{asset "mark.png"}}" alt="" width="40" height="40" decoding="async"> rss&#8202;expert</a>
+	</header>
+
+	<main id="form">
+		{{if .Parent}}
+		<article class="post post-quoted">
+			<header class="post-head">
+				<span class="avatar" aria-hidden="true">{{.Parent.Initial}}</span>
+				<span class="who">{{.Parent.Author}}</span>
+				<time class="when">{{.Parent.Age}}</time>
+			</header>
+			<div class="prose">{{.Parent.HTML}}</div>
+		</article>
+		<p class="reply-note">Your reply is published in your own feed. Their site reads it back from
+		there — nothing is posted onto anyone else's server.</p>
+		{{end}}
+
+		<form class="panel form" method="post" action="/write">
+			<h1>{{if .Parent}}Reply{{else}}Write{{end}}</h1>
+
+			{{if .Problem}}
+			<p class="form-problem" role="alert">{{.Problem}}</p>
+			{{end}}
+
+			<input type="hidden" name="csrf" value="{{.CSRF}}">
+			<input type="hidden" name="in_reply_to" value="{{.InReplyTo}}">
+
+			<label for="title">Title <span class="optional">optional — leave it empty for a short note</span></label>
+			<input id="title" name="title" type="text" value="{{.Draft}}" maxlength="200" autocomplete="off">
+
+			<label for="markdown">Text <span class="optional">Markdown. It travels as Markdown too, not only as HTML.</span></label>
+			<textarea id="markdown" name="markdown" rows="12" required autofocus>{{.Markdown}}</textarea>
+
+			{{if .Library}}
+			<fieldset class="attach">
+				<legend>Attach <span class="optional">from <a href="/settings/media">your files</a></span></legend>
+				{{range .Library}}
+				<label class="attach-choice">
+					<input type="checkbox" name="media" value="{{.ID}}">
+					{{if .IsImage}}<img src="{{.URL}}" alt="{{.Alt}}" loading="lazy">{{end}}
+					<span>{{if .Name}}{{.Name}}{{else}}{{.MediaType}}{{end}}</span>
+				</label>
+				{{end}}
+				<p class="form-aside">Anything you attach goes out as an enclosure in your feed.</p>
+			</fieldset>
+			{{end}}
+
+			<button type="submit" class="button-primary">Publish</button>
+
+			<p class="form-aside">Published here immediately, and carried out in your feed at
+			<code>/users/…/rss.xml</code> for anyone following you.</p>
+		</form>
+	</main>
+</div>
+
+{{template "colophon" .}}
+</body>
+</html>

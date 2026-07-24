@@ -4,7 +4,7 @@
 		<title>Relayed</title>
 		<link>https://relay.example/</link>
 		<lastBuildDate>Thu, 23 Jul 2026 18:00:00 GMT</lastBuildDate>
-		<generator>rss-social</generator>
+		<generator>rss-expert</generator>
 		<docs>https://www.rssboard.org/rss-specification</docs>
 		<source:self>https://relay.example/rss.xml</source:self>
 		<source:localTime>Thu, July 23, 2026 12:15 PM EDT</source:localTime>

@@ -26,12 +26,12 @@ func TestDefaults(t *testing.T) {
 }
 
 func TestEnvironmentOverrides(t *testing.T) {
-	t.Setenv("RSS_SOCIAL_DOMAIN", "example.org")
-	t.Setenv("RSS_SOCIAL_LISTEN", ":9999")
-	t.Setenv("RSS_SOCIAL_ADMIN_LISTEN", "127.0.0.1:9998")
-	t.Setenv("RSS_SOCIAL_DATA_DIR", t.TempDir())
-	t.Setenv("RSS_SOCIAL_LOG_FORMAT", "json")
-	t.Setenv("RSS_SOCIAL_LOG_LEVEL", "debug")
+	t.Setenv("RSS_EXPERT_DOMAIN", "example.org")
+	t.Setenv("RSS_EXPERT_LISTEN", ":9999")
+	t.Setenv("RSS_EXPERT_ADMIN_LISTEN", "127.0.0.1:9998")
+	t.Setenv("RSS_EXPERT_DATA_DIR", t.TempDir())
+	t.Setenv("RSS_EXPERT_LOG_FORMAT", "json")
+	t.Setenv("RSS_EXPERT_LOG_LEVEL", "debug")
 
 	c, err := Load()
 	if err != nil {
@@ -43,13 +43,13 @@ func TestEnvironmentOverrides(t *testing.T) {
 	if c.LogFormat != "json" || c.LogLevel != slog.LevelDebug {
 		t.Errorf("logging not read from environment: %+v", c)
 	}
-	if filepath.Base(c.DatabasePath()) != "rss-social.db" {
+	if filepath.Base(c.DatabasePath()) != "rss-expert.db" {
 		t.Errorf("DatabasePath = %q", c.DatabasePath())
 	}
 }
 
 func TestEmptyEnvironmentFallsBackToDefault(t *testing.T) {
-	t.Setenv("RSS_SOCIAL_LISTEN", "")
+	t.Setenv("RSS_EXPERT_LISTEN", "")
 	c, err := Load()
 	if err != nil {
 		t.Fatal(err)
@@ -60,13 +60,13 @@ func TestEmptyEnvironmentFallsBackToDefault(t *testing.T) {
 }
 
 func TestRejectsBadValues(t *testing.T) {
-	t.Setenv("RSS_SOCIAL_LOG_LEVEL", "chatty")
+	t.Setenv("RSS_EXPERT_LOG_LEVEL", "chatty")
 	if _, err := Load(); err == nil {
 		t.Error("an unknown log level was accepted")
 	}
 
-	t.Setenv("RSS_SOCIAL_LOG_LEVEL", "info")
-	t.Setenv("RSS_SOCIAL_LOG_FORMAT", "yaml")
+	t.Setenv("RSS_EXPERT_LOG_LEVEL", "info")
+	t.Setenv("RSS_EXPERT_LOG_FORMAT", "yaml")
 	if _, err := Load(); err == nil {
 		t.Error("an unknown log format was accepted")
 	}
@@ -86,5 +86,57 @@ func TestRequireServing(t *testing.T) {
 	c.Domain = "example.org"
 	if err := c.RequireServing(); err != nil {
 		t.Errorf("a plain hostname was rejected: %v", err)
+	}
+}
+
+func TestLimitsComeFromTheEnvironment(t *testing.T) {
+	t.Setenv("RSS_EXPERT_MEDIA_QUOTA_MB", "64")
+	t.Setenv("RSS_EXPERT_FETCH_LIMIT_MB", "2")
+	t.Setenv("RSS_EXPERT_POLL_WORKERS", "8")
+	t.Setenv("RSS_EXPERT_BEHIND_PROXY", "true")
+
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.MediaQuota != 64<<20 {
+		t.Errorf("media quota = %d", c.MediaQuota)
+	}
+	if c.FetchLimit != 2<<20 {
+		t.Errorf("fetch limit = %d", c.FetchLimit)
+	}
+	if c.PollWorkers != 8 {
+		t.Errorf("poll workers = %d", c.PollWorkers)
+	}
+	if !c.BehindProxy {
+		t.Error("behind-proxy was not read from the environment")
+	}
+}
+
+func TestNonsenseLimitsAreRefusedAtStartup(t *testing.T) {
+	for name, value := range map[string]string{
+		"RSS_EXPERT_MEDIA_QUOTA_MB": "0",
+		"RSS_EXPERT_FETCH_LIMIT_MB": "-3",
+		"RSS_EXPERT_POLL_WORKERS":   "9000",
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv(name, value)
+			if _, err := Load(); err == nil {
+				t.Errorf("%s=%q was accepted", name, value)
+			}
+		})
+	}
+}
+
+func TestTheDefaultsAreSaneWithNothingSet(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.MediaQuota != 512<<20 || c.FetchLimit != 5<<20 || c.PollWorkers != 4 {
+		t.Errorf("defaults drifted: quota=%d fetch=%d workers=%d", c.MediaQuota, c.FetchLimit, c.PollWorkers)
+	}
+	if c.BehindProxy || c.ShowPreview {
+		t.Error("an unconfigured instance trusts proxy headers or exposes the design preview")
 	}
 }

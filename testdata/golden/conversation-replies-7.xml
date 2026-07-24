@@ -6,7 +6,7 @@
 		<description>Replies to a post by Bob</description>
 		<pubDate>Thu, 23 Jul 2026 17:52:00 GMT</pubDate>
 		<lastBuildDate>Thu, 23 Jul 2026 18:00:00 GMT</lastBuildDate>
-		<generator>rss-social</generator>
+		<generator>rss-expert</generator>
 		<docs>https://www.rssboard.org/rss-specification</docs>
 		<source:self>https://bob.example/p/7/replies.xml</source:self>
 		<item>

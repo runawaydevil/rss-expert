@@ -1,0 +1,85 @@
+{{template "head" .}}
+<body>
+<a class="skip" href="#posts">Skip to the posts</a>
+
+<div class="page">
+	<header class="masthead">
+		<a class="wordmark" href="/"><img src="{{asset "mark.png"}}" alt="" width="40" height="40" decoding="async"> rss&#8202;expert</a>
+		{{if .Account}}
+		<a class="button-primary" href="/write">Write</a>
+		{{else}}
+		<a class="button-primary" href="/login">Log in</a>
+		{{end}}
+	</header>
+
+	<main id="posts">
+		<section class="h-card identity">
+			<h1 class="p-name">{{if .Verified}}{{if .Verified.Name}}{{.Verified.Name}}{{else}}{{.Handle}}{{end}}{{else}}{{.Handle}}{{end}}</h1>
+
+			<p class="identity-line">
+				<span class="identity-badge identity-local">account here</span>
+				{{if .Verified}}
+				<a class="identity-badge identity-verified u-url" rel="me" href="{{.Verified.URL}}"
+					data-tip="This domain and this account link to each other. That is what makes it verified — nobody vouched for it, the two ends agree.">{{.Verified.Host}} · verified</a>
+				{{end}}
+			</p>
+
+			{{if .Verified}}{{if .Verified.Note}}
+			<p class="p-note identity-note">{{.Verified.Note}}</p>
+			{{end}}{{end}}
+
+			<p class="identity-feeds">
+				<a href="{{.FeedURL}}">{{icon "rss"}} Everything {{.Handle}} writes</a>
+				{{if .Verified}}{{if .Verified.FeedURL}}
+				<a href="{{.Verified.FeedURL}}">{{icon "external-link"}} Their own site's feed</a>
+				{{end}}{{end}}
+			</p>
+
+			{{if .Sites}}
+			<details class="panel identity-claims">
+				<summary>Claimed domains</summary>
+				<div class="panel-body">
+					<ul class="claims">
+						{{range .Sites}}
+						<li class="claim claim-{{.State}}">
+							<span class="claim-state">{{.State}}</span>
+							<a href="{{.URL}}" {{if .Verified}}rel="me"{{end}}>{{.Host}}</a>
+							{{if not .Verified}}<span class="claim-note">nobody has checked this yet</span>{{end}}
+						</li>
+						{{end}}
+					</ul>
+					<p class="note">A claimed domain is only a claim. Verified means that domain and
+					this profile link to each other, so neither side can be faked alone.</p>
+				</div>
+			</details>
+			{{end}}
+		</section>
+
+		{{if .Posts}}
+		<ul class="reader">
+			{{range .Posts}}
+			<li class="post">
+				<header class="post-head">
+					<span class="avatar" aria-hidden="true">{{.Initial}}</span>
+					<span class="who">{{.Author}}</span>
+					<time class="when" datetime="{{.PublishedISO}}">{{.Age}}</time>
+				</header>
+				{{if .Title}}<h2><a href="{{.URL}}">{{.Title}}</a></h2>{{end}}
+				<div class="prose">{{.HTML}}</div>
+				<footer class="post-foot">
+					<a href="{{.URL}}">{{icon "external-link"}} Permalink</a>
+					{{if .ReplyCount}}<a href="{{.URL}}">{{icon "comment"}} {{.ReplyCount}} replies</a>{{end}}
+					<span class="via" title="{{.ArrivalTip}}">{{.Arrival}}</span>
+				</footer>
+			</li>
+			{{end}}
+		</ul>
+		{{else}}
+		<p class="empty">Nothing written here yet.</p>
+		{{end}}
+	</main>
+</div>
+
+{{template "colophon" .}}
+</body>
+</html>

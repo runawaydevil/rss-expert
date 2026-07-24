@@ -1,0 +1,72 @@
+{{template "head" .}}
+<body>
+<a class="skip" href="#rules">Skip to the rules</a>
+
+<div class="page">
+	<header class="masthead">
+		<a class="wordmark" href="/"><img src="{{asset "mark.png"}}" alt="" width="40" height="40" decoding="async"> rss&#8202;expert</a>
+		<a class="button-primary" href="/">Back to reading</a>
+	</header>
+
+	<main id="rules">
+		<h1>How this instance works</h1>
+
+		<section class="block">
+			<h2>What this is</h2>
+			<p class="lead">A reader for the open web. It follows feeds, and it publishes what
+			people here write as feeds of their own. Replies travel the same way. Nothing here
+			needs an account to read.</p>
+		</section>
+
+		<section class="block">
+			<h2>What we keep</h2>
+			<p class="lead">When this instance reads a feed, it stores the bytes it received, one
+			record per reading, and the version it decided to show — along with the reason it chose
+			that one. That history is what lets a parser bug be fixed without losing anything, and
+			it is what lets anyone ask where a post came from.</p>
+			<p class="lead">Raw copies of ordinary posts are discarded after 30 days. Copies tied to
+			a dispute, a report or a moderation decision are kept, because that is where evidence
+			actually matters.</p>
+		</section>
+
+		<section class="block">
+			<h2>What we do not do</h2>
+			<p class="lead">No behavioural profiling, no recommendation algorithm, no advertising,
+			no generated or summarised content. Your timeline is the feeds you follow, newest
+			first. Administrators cannot sign in as you, and there is no impersonation feature to
+			be abused.</p>
+		</section>
+
+		<section class="block">
+			<h2>Moderation</h2>
+			<p class="lead">Anyone can report a post. Moderators uphold or dismiss reports, and
+			every decision is written to an audit log — including the owner's. Blocks can apply to
+			one account or to the whole instance; instance-wide ones are a moderator decision.</p>
+			<p class="lead">A feed published by someone else is not ours to edit. When a source
+			deletes or changes a post, we follow. When a source returns <code>410 Gone</code>, we
+			stop.</p>
+		</section>
+
+		<section class="block">
+			<h2>Your data</h2>
+			<p class="lead">Your subscriptions export as OPML and any other reader will take the
+			file. Your posts travel in your own feed, addressed by permalink, so anything already
+			published stays reachable from your own copy. Ask the operator for an export or a
+			deletion and you get one.</p>
+			<p class="lead">Feeds we read are public documents, and we preserve the author, the
+			source, the original address and the date on everything we show. Public does not mean
+			ours: if you are an author and want your work off this instance, write to the operator
+			and it goes.</p>
+		</section>
+
+		<section class="block">
+			<h2>Contact</h2>
+			<p class="lead">This instance is run by whoever operates it. Removal requests,
+			moderation appeals and security reports all go to them.</p>
+		</section>
+	</main>
+</div>
+
+{{template "colophon" .}}
+</body>
+</html>

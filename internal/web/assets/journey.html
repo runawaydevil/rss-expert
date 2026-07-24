@@ -1,0 +1,95 @@
+{{template "head" .}}
+<body>
+<a class="skip" href="#journey">Skip to the journey</a>
+
+<div class="page">
+	<header class="masthead">
+		<a class="wordmark" href="/"><img src="{{asset "mark.png"}}" alt="" width="40" height="40" decoding="async"> rss&#8202;expert</a>
+		<a class="button-primary" href="{{.Post.URL}}">Back to the post</a>
+	</header>
+
+	<main id="journey">
+		<h1>Where it went</h1>
+		<p class="lead">Publishing is not one event. It is a feed anyone can pull, and a set of
+		notifications pushed to whoever you answered. This page shows both, and does not hide the
+		parts that failed.</p>
+
+		<section class="block">
+			<h2>The post</h2>
+			<article class="post">
+				<header class="post-head">
+					<span class="avatar" aria-hidden="true">{{.Post.Initial}}</span>
+					<span class="who">{{.Post.Author}}</span>
+					<time class="when" datetime="{{.Post.PublishedISO}}">{{.Post.Age}}</time>
+				</header>
+				{{if .Post.Title}}<h3 class="entry-title">{{.Post.Title}}</h3>{{end}}
+				<div class="prose">{{.Post.HTML}}</div>
+			</article>
+		</section>
+
+		<section class="block">
+			<h2>Pulled</h2>
+			<p class="lead">Anyone following this account already has it. Nothing had to be
+			delivered — the feed is simply there, and readers fetch it when they choose.</p>
+			<ul class="ledger">
+				<li>
+					<span class="ledger-outcome ledger-ok">available</span>
+					<span class="ledger-target"><a href="{{.FeedURL}}">{{.FeedURL}}</a></span>
+					<span class="ledger-detail">the account's own feed</span>
+				</li>
+				<li>
+					<span class="ledger-outcome ledger-ok">available</span>
+					<span class="ledger-target"><a href="/users/rss.xml">/users/rss.xml</a></span>
+					<span class="ledger-detail">the instance firehose</span>
+				</li>
+			</ul>
+		</section>
+
+		<section class="block">
+			<h2>Pushed</h2>
+			{{if .Mentions}}
+			<ul class="ledger">
+				{{range .Mentions}}
+				<li>
+					<span class="ledger-outcome ledger-{{.State}}">{{.State}}</span>
+					<span class="ledger-target">{{.Target}}</span>
+					<span class="ledger-detail">
+						{{if .Endpoint}}via {{.Endpoint}}{{end}}
+						{{if .LastError}}{{.LastError}}{{end}}
+					</span>
+				</li>
+				{{end}}
+			</ul>
+			{{else}}
+			<p class="empty">Nothing to push. This post answers no one, so there was nobody to
+			notify.</p>
+			{{end}}
+		</section>
+
+		{{if .Attempts}}
+		<section class="block">
+			<h2>Every attempt, in order</h2>
+			<p class="lead">Nothing here is overwritten. A failure that was later retried
+			successfully stays on the record — that is the point of keeping it.</p>
+			<ul class="ledger">
+				{{range .Attempts}}
+				<li>
+					<span class="ledger-outcome ledger-{{.Outcome}}">{{.Outcome}}</span>
+					<span class="ledger-target">{{.Protocol}} → {{.Target}}</span>
+					<span class="ledger-detail">
+						attempt {{.AttemptNo}}
+						{{if .HTTPStatus}} · HTTP {{.HTTPStatus}}{{end}}
+						{{if .Latency}} · {{.Latency}}{{end}}
+						{{if .ErrorDetail}} · {{.ErrorDetail}}{{end}}
+					</span>
+				</li>
+				{{end}}
+			</ul>
+		</section>
+		{{end}}
+	</main>
+</div>
+
+{{template "colophon" .}}
+</body>
+</html>

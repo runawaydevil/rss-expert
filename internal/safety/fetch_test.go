@@ -282,3 +282,30 @@ func FuzzCheckURL(f *testing.F) {
 		}
 	})
 }
+
+func TestContentTypeFilterOnlyGuardsBodiesWeParse(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "gone", http.StatusGone)
+	})
+
+	f := localFetcher(Options{AcceptContentTypes: []string{"text/html"}})
+	res, err := f.Get(context.Background(), srv.URL, nil)
+	if err != nil {
+		t.Fatalf("a 410 with a plain-text body was rejected on content type: %v", err)
+	}
+	if res.StatusCode != http.StatusGone {
+		t.Errorf("status = %d, want 410 so the caller can act on it", res.StatusCode)
+	}
+}
+
+func TestContentTypeFilterStillGuardsSuccessfulBodies(t *testing.T) {
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/pdf")
+		fmt.Fprint(w, "%PDF-1.4")
+	})
+
+	f := localFetcher(Options{AcceptContentTypes: []string{"text/html"}})
+	if _, err := f.Get(context.Background(), srv.URL, nil); !errors.Is(err, ErrContentType) {
+		t.Errorf("a 200 with the wrong type gave %v, want ErrContentType", err)
+	}
+}

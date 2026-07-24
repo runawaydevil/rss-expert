@@ -1,0 +1,85 @@
+{{template "head" .}}
+<body>
+<a class="skip" href="#post">Skip to the post</a>
+
+<div class="page">
+	<header class="masthead">
+		<a class="wordmark" href="/"><img src="{{asset "mark.png"}}" alt="" width="40" height="40" decoding="async"> rss&#8202;expert</a>
+		{{if .Account}}
+		<a class="button-primary" href="/write">Write</a>
+		{{else}}
+		<a class="button-primary" href="/login">Log in</a>
+		{{end}}
+	</header>
+
+	<main id="post">
+		<article class="post">
+			<header class="post-head">
+				<span class="avatar" aria-hidden="true">{{.Post.Initial}}</span>
+				<span class="who">{{.Post.Author}}</span>
+				<a class="site" href="{{.Post.SiteURL}}"
+					data-tip="Everything this account writes travels in one feed. This is where it lives.">{{.Post.Site}}</a>
+				<time class="when" datetime="{{.Post.PublishedISO}}">{{.Post.Age}}</time>
+			</header>
+
+			{{if .Post.Title}}<h1 class="post-title">{{.Post.Title}}</h1>{{end}}
+
+			{{if .Post.InReplyTo}}
+			<p class="in-reply-to">In reply to
+				<a class="u-in-reply-to" href="{{.Post.InReplyTo}}"
+					data-tip="The post this answers. The link is how the other site knows it was answered.">{{.Post.InReplyTo}}</a>
+			</p>
+			{{end}}
+
+			<div class="prose">{{.Post.HTML}}</div>
+
+			{{template "attachments" .Post}}
+
+			<footer class="post-foot">
+				{{if $.Account}}
+				<a href="/write?to={{.Post.GUID}}"
+					aria-label="Reply. Your reply is published in your own feed; their site reads it back from there."
+					data-tip="Your reply is published in your own feed. Their site reads it back from there.">{{icon "comment"}} Reply</a>
+				{{end}}
+				<a href="{{.Post.URL}}/journey"
+					aria-label="Where it went. Every feed it is in and every notification that was pushed."
+					data-tip="Every feed it sits in, and every notification pushed to whoever it answered — including the attempts that failed.">{{icon "check"}} Where it went</a>
+				<a href="{{.RepliesURL}}"
+					aria-label="The replies feed. An RSS feed of the answers to this post."
+					data-tip="An RSS feed of the replies to this one post. Every level of a conversation has one.">{{icon "rss"}} Replies feed</a>
+				<span class="via" title="{{.Post.ArrivalTip}}">{{.Post.Arrival}}</span>
+			</footer>
+		</article>
+
+		{{if .Replies}}
+		<h2 class="replies-heading">{{len .Replies}} {{if eq (len .Replies) 1}}reply{{else}}replies{{end}}</h2>
+		<ul class="reader replies">
+			{{range .Replies}}
+			<li class="post post-reply">
+				<header class="post-head">
+					<span class="avatar" aria-hidden="true">{{.Initial}}</span>
+					<span class="who">{{.Author}}</span>
+					<time class="when" datetime="{{.PublishedISO}}">{{.Age}}</time>
+				</header>
+				{{if .InReplyTo}}
+				<p class="in-reply-to">In reply to <a class="u-in-reply-to" href="{{.InReplyTo}}">{{.InReplyTo}}</a></p>
+				{{end}}
+				<div class="prose">{{.HTML}}</div>
+				<footer class="post-foot">
+					{{if $.Account}}
+					<a href="/write?to={{.GUID}}"
+						data-tip="Replies nest. Each level carries its own feed.">{{icon "comment"}} Reply</a>
+					{{end}}
+					<a href="{{.URL}}">{{icon "external-link"}} Permalink</a>
+					<span class="via" title="{{.ArrivalTip}}">{{.Arrival}}</span>
+				</footer>
+			</li>
+			{{end}}
+		</ul>
+		{{end}}
+	</main>
+</div>
+
+{{template "colophon" .}}
+</body>
+</html>

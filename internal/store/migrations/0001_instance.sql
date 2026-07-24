@@ -6,7 +6,7 @@ create table instance (
 ) strict;
 
 insert into instance (key, value, updated_at)
-values ('schema_origin', 'rss-social', unixepoch());
+values ('schema_origin', 'rss-expert', unixepoch());
 
 -- +goose Down
 drop table instance;

@@ -7,7 +7,7 @@
 		<language>en-us</language>
 		<pubDate>Thu, 23 Jul 2026 17:40:00 GMT</pubDate>
 		<lastBuildDate>Thu, 23 Jul 2026 18:00:00 GMT</lastBuildDate>
-		<generator>rss-social</generator>
+		<generator>rss-expert</generator>
 		<docs>https://www.rssboard.org/rss-specification</docs>
 		<source:self>https://alice.example/rss.xml</source:self>
 		<source:account service="bluesky">@alice.example</source:account>

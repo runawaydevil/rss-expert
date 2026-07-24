@@ -1,10 +1,12 @@
 # Binaries
-/rss-social
-/rss-social.exe
+/rss-expert
+/rss-expert.exe
 /dist/
 
 # Local runtime data
 /data/
+/data-local/
+*serve.log
 *.db
 *.db-wal
 *.db-shm
@@ -21,7 +23,10 @@
 *.prof
 /testdata/tmp/
 
-# Environment
+# Notes and design documents: personal for now, not published
+/docs/
+
+# Environment (.env.example is the only one that travels)
 .env
 .env.local
 

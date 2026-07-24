@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/runawaydevil/rss-social/internal/feed"
-	"github.com/runawaydevil/rss-social/internal/feedin"
+	"github.com/runawaydevil/rss-expert/internal/feed"
+	"github.com/runawaydevil/rss-expert/internal/feedin"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files")
@@ -52,7 +52,7 @@ var buildTime = at("2026-07-23T18:00:00Z")
 
 func emitOptions() RSSOptions {
 	return RSSOptions{
-		Generator: "rss-social",
+		Generator: "rss-expert",
 		Docs:      "https://www.rssboard.org/rss-specification",
 		BuildTime: buildTime,
 	}

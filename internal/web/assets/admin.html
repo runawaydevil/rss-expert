@@ -1,0 +1,158 @@
+{{template "head" .}}
+<body>
+<a class="skip" href="#panel">Skip to the panel</a>
+
+<div class="page">
+	<header class="masthead">
+		<a class="wordmark" href="/"><img src="{{asset "mark.png"}}" alt="" width="40" height="40" decoding="async"> rss&#8202;expert</a>
+		<a class="button-primary" href="/">Back to reading</a>
+	</header>
+
+	<main id="panel">
+		<h1>Administration</h1>
+
+		<section class="block">
+			<h2>What is in the store</h2>
+			<dl class="facts-grid">
+				<div><dt>Items</dt><dd>{{.Items}}</dd></div>
+				<div><dt>Observations</dt><dd>{{.Observations}}</dd></div>
+				<div><dt>Payloads kept</dt><dd>{{.Payloads}}</dd></div>
+				<div><dt>Database</dt><dd>{{printf "%.1f" .DatabaseMiB}} MiB</dd></div>
+			</dl>
+			<p class="note">More observations than items is normal and healthy: it means the same
+			post arrived by more than one route and the winner was chosen, not guessed.</p>
+		</section>
+
+		<section class="block">
+			<h2>Queue</h2>
+			<dl class="facts-grid">
+				<div><dt>Ready</dt><dd>{{.Queue.Ready}}</dd></div>
+				<div><dt>Being worked</dt><dd>{{.Queue.Leased}}</dd></div>
+				<div><dt>Dead letter</dt><dd class="{{if .Queue.DeadLetter}}bad{{end}}">{{.Queue.DeadLetter}}</dd></div>
+				<div><dt>Finished</dt><dd>{{.Queue.Done}}</dd></div>
+			</dl>
+			{{if .Queue.DeadLetter}}
+			<p class="note">Jobs in the dead letter gave up after every retry. Each one needs a
+			human to look at it before it is retried.</p>
+			{{end}}
+		</section>
+
+		{{if .Failing}}
+		<section class="block">
+			<h2>Deliveries that did not land</h2>
+			<ul class="ledger">
+				{{range .Failing}}
+				<li>
+					<span class="ledger-outcome ledger-{{.Outcome}}">{{.Outcome}}</span>
+					<span class="ledger-target">{{.Protocol}} → {{.Target}}</span>
+					<span class="ledger-detail">attempt {{.AttemptNo}}{{if .HTTPStatus}} · HTTP {{.HTTPStatus}}{{end}}{{if .ErrorDetail}} · {{.ErrorDetail}}{{end}}</span>
+				</li>
+				{{end}}
+			</ul>
+		</section>
+		{{end}}
+
+		<section class="block">
+			<h2>Reports</h2>
+			{{if .Reports}}
+			<ul class="reports">
+				{{range .Reports}}
+				<li class="report">
+					<p class="report-item"><a href="{{.ItemKey}}">{{.ItemKey}}</a></p>
+					<p class="report-reason">{{.Reason}}{{if .Context}} — {{.Context}}{{end}}</p>
+					<form method="post" action="/admin/report" class="report-decision">
+						<input type="hidden" name="csrf" value="{{$.CSRF}}">
+						<input type="hidden" name="report" value="{{.ID}}">
+						<label class="sr-only" for="note-{{.ID}}">Note</label>
+						<input id="note-{{.ID}}" name="note" type="text" placeholder="Why (optional)">
+						<button type="submit" name="decision" value="uphold"
+							data-tip="Agree with the report. The decision is written to the audit log.">Uphold</button>
+						<button type="submit" name="decision" value="dismiss"
+							data-tip="Disagree. Also written to the audit log.">Dismiss</button>
+					</form>
+				</li>
+				{{end}}
+			</ul>
+			{{else}}
+			<p class="empty">Nothing reported.</p>
+			{{end}}
+		</section>
+
+		<section class="block">
+			<h2>Blocks</h2>
+			<form class="panel form" method="post" action="/admin/block">
+				<input type="hidden" name="csrf" value="{{.CSRF}}">
+				<label for="kind">What to block</label>
+				<select id="kind" name="kind">
+					<option value="domain">A domain</option>
+					<option value="source">A feed</option>
+					<option value="item">One item</option>
+					<option value="word">A word</option>
+				</select>
+				<label for="value">Value</label>
+				<input id="value" name="value" type="text" required placeholder="spam.example">
+				<label for="scope">Who it applies to</label>
+				<select id="scope" name="scope">
+					<option value="instance">Everyone on this instance</option>
+					<option value="mine">Only me</option>
+				</select>
+				<label for="reason">Reason <span class="optional">goes to the audit log</span></label>
+				<input id="reason" name="reason" type="text">
+				<button type="submit" class="button-primary">Block</button>
+			</form>
+
+			{{if .Blocks}}
+			<ul class="blocks">
+				{{range .Blocks}}
+				<li>
+					<span class="block-kind">{{.Kind}}</span>
+					<span class="block-value">{{.Value}}</span>
+					<span class="block-scope">{{if .Instance}}instance{{else}}only you{{end}}</span>
+					<form method="post" action="/admin/block" class="inline">
+						<input type="hidden" name="csrf" value="{{$.CSRF}}">
+						<input type="hidden" name="action" value="unblock">
+						<input type="hidden" name="kind" value="{{.Kind}}">
+						<input type="hidden" name="value" value="{{.Value}}">
+						<input type="hidden" name="scope" value="{{if .Instance}}instance{{else}}mine{{end}}">
+						<button type="submit">Remove</button>
+					</form>
+				</li>
+				{{end}}
+			</ul>
+			{{end}}
+		</section>
+
+		<section class="block">
+			<h2>Your account</h2>
+			<p class="note">
+				Two-factor is <strong>{{if .TwoFactor}}on{{else}}off{{end}}</strong>{{if .TwoFactor}},
+				with {{.CodesLeft}} recovery codes left{{end}}.
+				<a href="/settings/two-factor">Change it</a>.
+			</p>
+		</section>
+
+		<section class="block">
+			<h2>Audit log</h2>
+			<p class="note">Every administrative action, including the owner's. An administrator
+			nobody audits is an administrator nobody can trust.</p>
+			{{if .Audit}}
+			<ul class="audit">
+				{{range .Audit}}
+				<li>
+					<span class="audit-action">{{.Action}}</span>
+					<span class="audit-role">{{.Role}}</span>
+					{{if .Subject}}<span class="audit-subject">{{.Subject}}</span>{{end}}
+					{{if .Detail}}<span class="audit-detail">{{.Detail}}</span>{{end}}
+				</li>
+				{{end}}
+			</ul>
+			{{else}}
+			<p class="empty">Nothing has happened yet.</p>
+			{{end}}
+		</section>
+	</main>
+</div>
+
+{{template "colophon" .}}
+</body>
+</html>

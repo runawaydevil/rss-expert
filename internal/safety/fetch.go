@@ -70,7 +70,7 @@ func New(o Options) *Fetcher {
 		o.Timeout = DefaultTimeout
 	}
 	if o.UserAgent == "" {
-		o.UserAgent = "rss-social"
+		o.UserAgent = "rss-expert"
 	}
 
 	dialer := &net.Dialer{Timeout: DefaultDialTimeout, KeepAlive: 30 * time.Second}
@@ -138,8 +138,10 @@ func (f *Fetcher) Get(ctx context.Context, rawURL string, header http.Header) (*
 		io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<10))
 		return &Result{URL: final, StatusCode: resp.StatusCode, Header: resp.Header}, nil
 	}
-	if err := f.checkContentType(resp.Header.Get("Content-Type")); err != nil {
-		return nil, err
+	if resp.StatusCode < 400 {
+		if err := f.checkContentType(resp.Header.Get("Content-Type")); err != nil {
+			return nil, err
+		}
 	}
 	body, err := readLimited(resp.Body, f.maxBytes)
 	if err != nil {
@@ -221,4 +223,23 @@ func unwrapURLError(err error) error {
 		return ue.Err
 	}
 	return err
+}
+
+func (f *Fetcher) Do(req *http.Request) (*http.Response, error) {
+	if err := CheckURL(req.URL); err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", f.agent)
+	req.Header.Del("Authorization")
+	req.Header.Del("Cookie")
+
+	resp, err := f.client.Do(req)
+	if err != nil {
+		return nil, unwrapURLError(err)
+	}
+	resp.Body = struct {
+		io.Reader
+		io.Closer
+	}{io.LimitReader(resp.Body, f.maxBytes), resp.Body}
+	return resp, nil
 }

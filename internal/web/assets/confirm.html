@@ -1,0 +1,40 @@
+{{template "head" .}}
+<body>
+<a class="skip" href="#form">Skip to the form</a>
+
+<div class="page">
+	<header class="masthead">
+		<a class="wordmark" href="/"><img src="{{asset "mark.png"}}" alt="" width="40" height="40" decoding="async"> rss&#8202;expert</a>
+	</header>
+
+	<main id="form">
+		<form class="panel form panel-narrow" method="post" action="/admin/confirm">
+			<h1>Confirm it is you</h1>
+
+			<p class="form-lead">You are signed in, but this action is destructive. Enter your
+			password again — a session left open on a shared machine should not be enough.</p>
+
+			{{if .Problem}}
+			<p class="form-problem" role="alert">{{.Problem}}</p>
+			{{end}}
+
+			<input type="hidden" name="csrf" value="{{.CSRF}}">
+			<input type="hidden" name="next" value="{{.Next}}">
+
+			<label for="password">Password</label>
+			<input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+
+			<label for="code">Two-factor code <span class="optional">if your account has one</span></label>
+			<input id="code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code"
+				pattern="[0-9 a-z\-]*" maxlength="20">
+
+			<button type="submit" class="button-primary">Confirm</button>
+
+			<p class="form-aside">This unlocks destructive actions for {{"10"}} minutes.</p>
+		</form>
+	</main>
+</div>
+
+{{template "colophon" .}}
+</body>
+</html>

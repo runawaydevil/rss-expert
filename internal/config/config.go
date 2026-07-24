@@ -5,30 +5,64 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
-const envPrefix = "RSS_SOCIAL_"
+const envPrefix = "RSS_EXPERT_"
 
 type Config struct {
-	Domain      string
-	Listen      string
-	AdminListen string
-	DataDir     string
-	SMTPURL     string
-	LogFormat   string
-	LogLevel    slog.Level
+	Domain        string
+	Listen        string
+	AdminListen   string
+	DataDir       string
+	SMTPURL       string
+	LogFormat     string
+	LogLevel      slog.Level
+	AdminEmail    string
+	AdminPassword string
+	BehindProxy   bool
+	ShowPreview   bool
+	MediaQuota    int64
+	FetchLimit    int64
+	PollWorkers   int
 }
 
 func Load() (Config, error) {
-	c := Config{
-		Domain:      env("DOMAIN", ""),
-		Listen:      env("LISTEN", ":11080"),
-		AdminListen: env("ADMIN_LISTEN", "127.0.0.1:11090"),
-		DataDir:     env("DATA_DIR", "data"),
-		SMTPURL:     env("SMTP_URL", ""),
-		LogFormat:   strings.ToLower(env("LOG_FORMAT", "text")),
+	if err := LoadEnvFiles(); err != nil {
+		return Config{}, fmt.Errorf("%sENV_FILE: %w", envPrefix, err)
 	}
+
+	c := Config{
+		Domain:        env("DOMAIN", ""),
+		Listen:        env("LISTEN", ":11080"),
+		AdminListen:   env("ADMIN_LISTEN", "127.0.0.1:11090"),
+		DataDir:       env("DATA_DIR", "data"),
+		SMTPURL:       env("SMTP_URL", ""),
+		LogFormat:     strings.ToLower(env("LOG_FORMAT", "text")),
+		AdminEmail:    env("ADMIN_EMAIL", ""),
+		AdminPassword: env("ADMIN_PASSWORD", ""),
+		BehindProxy:   truthy(env("BEHIND_PROXY", "")),
+		ShowPreview:   truthy(env("SHOW_PREVIEW", "")),
+	}
+
+	quota, err := megabytes("MEDIA_QUOTA_MB", 512)
+	if err != nil {
+		return c, err
+	}
+	c.MediaQuota = quota
+
+	limit, err := megabytes("FETCH_LIMIT_MB", 5)
+	if err != nil {
+		return c, err
+	}
+	c.FetchLimit = limit
+
+	workers, err := count("POLL_WORKERS", 4, 1, 64)
+	if err != nil {
+		return c, err
+	}
+	c.PollWorkers = workers
 
 	level, err := parseLevel(env("LOG_LEVEL", "info"))
 	if err != nil {
@@ -52,7 +86,7 @@ func Load() (Config, error) {
 }
 
 func (c Config) DatabasePath() string {
-	return filepath.Join(c.DataDir, "rss-social.db")
+	return filepath.Join(c.DataDir, "rss-expert.db")
 }
 
 func (c Config) RequireServing() error {
@@ -71,6 +105,39 @@ func (c Config) Logger(w *os.File) *slog.Logger {
 		return slog.New(slog.NewJSONHandler(w, opts))
 	}
 	return slog.New(slog.NewTextHandler(w, opts))
+}
+
+func truthy(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
+}
+
+func megabytes(name string, fallback int64) (int64, error) {
+	raw := env(name, "")
+	if raw == "" {
+		return fallback << 20, nil
+	}
+	n, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64)
+	if err != nil || n <= 0 {
+		return 0, fmt.Errorf("%s%s must be a positive whole number of megabytes, got %q", envPrefix, name, raw)
+	}
+	return n << 20, nil
+}
+
+func count(name string, fallback, low, high int) (int, error) {
+	raw := env(name, "")
+	if raw == "" {
+		return fallback, nil
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || n < low || n > high {
+		return 0, fmt.Errorf("%s%s must be a whole number between %d and %d, got %q",
+			envPrefix, name, low, high, raw)
+	}
+	return n, nil
 }
 
 func env(name, fallback string) string {

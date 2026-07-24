@@ -4,8 +4,12 @@ data
 docs
 testdata/tmp
 tools/threadwalker/node_modules
-rss-social
-rss-social.exe
+rss-expert
+rss-expert.exe
 *.db
 *.db-wal
 *.db-shm
+.env
+.env.local
+data-local
+assets
