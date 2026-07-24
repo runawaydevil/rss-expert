@@ -1362,3 +1362,45 @@ a {
 	font-size: var(--text-sm);
 	word-break: break-all;
 }
+
+.readings {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	gap: var(--space-2);
+}
+
+.reading {
+	display: grid;
+	grid-template-columns: 8rem 1fr;
+	gap: var(--space-2) var(--space-4);
+	align-items: baseline;
+	padding: var(--space-2) 0;
+	border-bottom: 1px solid var(--rule);
+}
+
+.reading-label {
+	font-family: var(--font-state);
+	font-size: var(--text-xs);
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--ink-3);
+}
+
+.reading-value {
+	font-family: var(--font-state);
+	font-size: var(--text-sm);
+	color: var(--ink);
+}
+
+.reading-detail {
+	grid-column: 2;
+	font-size: var(--text-xs);
+	color: var(--ink-3);
+}
+
+.reading-bad .reading-value {
+	color: var(--err);
+	font-weight: 700;
+}

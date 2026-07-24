@@ -1,0 +1,65 @@
+{{template "head" .}}
+<body>
+<a class="skip" href="#status">Skip to the readings</a>
+
+<div class="page">
+	<header class="masthead">
+		<a class="wordmark" href="/"><img src="{{asset "mark.png"}}" alt="" width="40" height="40" decoding="async"> rss&#8202;expert</a>
+		<a class="button-primary" href="/admin">Moderation</a>
+	</header>
+
+	<main id="status">
+		<h1>Status</h1>
+		<p class="lead">What this instance is doing right now. Nobody sees this page without
+		signing in.</p>
+
+		<section class="block">
+			<ul class="readings">
+				{{range .Readings}}
+				<li class="reading{{if .Bad}} reading-bad{{end}}">
+					<span class="reading-label">{{.Label}}</span>
+					<span class="reading-value">{{.Value}}</span>
+					{{if .Detail}}<span class="reading-detail">{{.Detail}}</span>{{end}}
+				</li>
+				{{end}}
+			</ul>
+		</section>
+
+		<section class="block">
+			<h2>Sources in trouble</h2>
+			{{if .Failing}}
+			<ul class="reader">
+				{{range .Failing}}
+				<li class="source source-{{.State}}">
+					<a href="{{.FeedURL}}">{{if .Title}}{{.Title}}{{else}}{{.FeedURL}}{{end}}</a>
+					<p class="note">{{.Detail}}</p>
+					{{if .Action}}<p class="note">{{.Action}}</p>{{end}}
+				</li>
+				{{end}}
+			</ul>
+			{{else}}
+			<p class="lead">None. Every source answered the last time it was read.</p>
+			{{end}}
+		</section>
+
+		<section class="block">
+			<h2>Machine readable</h2>
+			<p class="lead"><code>/healthz</code> answers <code>ok</code> to anyone, so an uptime
+			monitor can watch this instance without a login. <code>/readyz</code> says whether the
+			database is answering and the schema is current.</p>
+			{{if .Metrics}}
+			<p class="lead"><code>/metrics</code> is open to whoever carries the token from
+			<code>RSS_EXPERT_METRICS_TOKEN</code>, as a bearer header or a <code>?token=</code>
+			parameter.</p>
+			{{else}}
+			<p class="lead"><code>/metrics</code> is switched off. It answers 404 until
+			<code>RSS_EXPERT_METRICS_TOKEN</code> is set, so it can never be published by
+			accident.</p>
+			{{end}}
+		</section>
+	</main>
+</div>
+
+{{template "colophon" .}}
+</body>
+</html>

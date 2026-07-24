@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -45,11 +46,41 @@ func TestPragmasTakeEffect(t *testing.T) {
 		}
 	}
 
-	if writer["cache_size"] != "-20000" {
-		t.Errorf("writer cache_size = %q, want -20000", writer["cache_size"])
+	if writer["cache_size"] != "-20480" {
+		t.Errorf("writer cache_size = %q, want -20480", writer["cache_size"])
 	}
-	if reader["cache_size"] != "-8000" {
-		t.Errorf("reader cache_size = %q, want -8000", reader["cache_size"])
+	if reader["cache_size"] != "-8192" {
+		t.Errorf("reader cache_size = %q, want -8192", reader["cache_size"])
+	}
+}
+
+func TestTheCacheFollowsWhatItWasAsked(t *testing.T) {
+	ctx := context.Background()
+
+	dir, err := os.MkdirTemp("", "rss-expert-cache")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+
+	db, err := OpenWith(ctx, filepath.Join(dir, "test.db"), 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	var writer, reader string
+	if err := db.Write.QueryRowContext(ctx, "pragma cache_size").Scan(&writer); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Read.QueryRowContext(ctx, "pragma cache_size").Scan(&reader); err != nil {
+		t.Fatal(err)
+	}
+	if writer != "-4096" {
+		t.Errorf("writer cache_size = %q, want -4096 for a 4 MiB budget", writer)
+	}
+	if reader != "-1638" {
+		t.Errorf("reader cache_size = %q, want -1638", reader)
 	}
 }
 

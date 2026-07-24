@@ -14,7 +14,7 @@ const envPrefix = "RSS_EXPERT_"
 type Config struct {
 	Domain        string
 	Listen        string
-	AdminListen   string
+	MetricsToken  string
 	DataDir       string
 	SMTPURL       string
 	LogFormat     string
@@ -26,6 +26,7 @@ type Config struct {
 	MediaQuota    int64
 	FetchLimit    int64
 	PollWorkers   int
+	CacheMiB      int
 }
 
 func Load() (Config, error) {
@@ -36,7 +37,7 @@ func Load() (Config, error) {
 	c := Config{
 		Domain:        env("DOMAIN", ""),
 		Listen:        env("LISTEN", ":11080"),
-		AdminListen:   env("ADMIN_LISTEN", "127.0.0.1:11090"),
+		MetricsToken:  env("METRICS_TOKEN", ""),
 		DataDir:       env("DATA_DIR", "data"),
 		SMTPURL:       env("SMTP_URL", ""),
 		LogFormat:     strings.ToLower(env("LOG_FORMAT", "text")),
@@ -63,6 +64,12 @@ func Load() (Config, error) {
 		return c, err
 	}
 	c.PollWorkers = workers
+
+	cache, err := count("DB_CACHE_MB", 20, 1, 1024)
+	if err != nil {
+		return c, err
+	}
+	c.CacheMiB = cache
 
 	level, err := parseLevel(env("LOG_LEVEL", "info"))
 	if err != nil {

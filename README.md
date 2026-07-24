@@ -26,9 +26,8 @@ Run
     docker compose up -d
 
 Compose publishes the app on 11081 by default; change RSS_EXPERT_HTTP_PORT if
-that one is taken. Inside the container it is always 11080. The admin panel
-listens on 127.0.0.1:11090 and is not published at all; reach it over an SSH
-tunnel.
+that one is taken. Inside the container it is always 11080. That is the only
+port: health, readiness, metrics and the status page all live behind it.
 
 The first owner account is created from the environment on first boot. After
 you have signed in, unset the password variable and restart -- it is only read
@@ -44,7 +43,6 @@ Everything is RSS_EXPERT_-prefixed. Only DOMAIN is required.
     DOMAIN            public hostname this instance publishes in its feeds
     HTTP_PORT         port compose publishes on the host  (11081)
     LISTEN            app address inside                 (:11080)
-    ADMIN_LISTEN      admin address, keep it local       (127.0.0.1:11090)
     DATA_DIR          database, uploads and backups      (data)
     ADMIN_EMAIL       owner account, first boot only
     ADMIN_PASSWORD    owner password, first boot only, 12 characters or more
@@ -53,6 +51,8 @@ Everything is RSS_EXPERT_-prefixed. Only DOMAIN is required.
     MEDIA_QUOTA_MB    uploads kept per account           (512)
     FETCH_LIMIT_MB    ceiling on any single fetch        (5)
     POLL_WORKERS      feeds fetched at once              (4)
+    DB_CACHE_MB       SQLite page cache, writer          (20)
+    METRICS_TOKEN     opens /metrics; empty means 404    (empty)
     SHOW_PREVIEW      serve /dev/preview                 (false)
     LOG_FORMAT        text or json                       (text)
     LOG_LEVEL         debug, info, warn, error           (info)
@@ -73,6 +73,19 @@ Commands
     rss-expert restore --from DIR --check   verify without changing anything
     rss-expert sources add URL              subscribe from the shell
     rss-expert version
+
+
+Operating
+---------
+
+    /healthz        answers "ok" to anyone, for an uptime monitor
+    /readyz         database answering and schema current, no detail leaked
+    /metrics        Prometheus format, only with METRICS_TOKEN
+    /debug/heap     pprof heap profile, same token
+    /admin/status   the same numbers as a page, for whoever is signed in
+
+Nothing operational is public: the two probes carry no detail, and the rest is
+404 until a token exists.
 
 
 Interop

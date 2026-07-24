@@ -15,7 +15,7 @@ import (
 func healthcheck(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("healthcheck", flag.ExitOnError)
 	timeout := fs.Duration("timeout", 3*time.Second, "how long to wait for an answer")
-	path := fs.String("path", "/readyz", "endpoint to probe on the admin address")
+	path := fs.String("path", "/readyz", "endpoint to probe")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -28,7 +28,7 @@ func healthcheck(ctx context.Context, args []string) error {
 	ctx, cancel := context.WithTimeout(ctx, *timeout)
 	defer cancel()
 
-	url := "http://" + dialableAddress(cfg.AdminListen) + *path
+	url := "http://" + dialableAddress(cfg.Listen) + *path
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err

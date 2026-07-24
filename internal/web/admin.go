@@ -2,8 +2,12 @@ package web
 
 import (
 	"context"
+	"crypto/subtle"
+	"fmt"
 	"net/http"
+	"net/http/pprof"
 	"runtime"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -14,13 +18,14 @@ import (
 	"github.com/runawaydevil/rss-expert/internal/store"
 )
 
-type Admin struct {
+type ops struct {
 	db       *store.DB
 	version  string
+	token    string
 	registry *prometheus.Registry
 }
 
-func NewAdmin(db *store.DB, version string) *Admin {
+func newOps(db *store.DB, version, token string) *ops {
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(
 		collectors.NewGoCollector(),
@@ -96,40 +101,61 @@ func NewAdmin(db *store.DB, version string) *Admin {
 		}))
 	}
 
-	return &Admin{db: db, version: version, registry: registry}
+	return &ops{db: db, version: version, token: token, registry: registry}
 }
 
-func (a *Admin) Handler() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", a.healthz)
-	mux.HandleFunc("GET /readyz", a.readyz)
-	mux.Handle("GET /metrics", promhttp.HandlerFor(a.registry, promhttp.HandlerOpts{}))
-	return mux
-}
-
-func (a *Admin) healthz(w http.ResponseWriter, r *http.Request) {
+func (o *ops) healthz(w http.ResponseWriter, r *http.Request) {
 	plain(w, http.StatusOK, "ok")
 }
 
-func (a *Admin) readyz(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	if err := a.db.Read.PingContext(ctx); err != nil {
-		plain(w, http.StatusServiceUnavailable, "database unreachable: "+err.Error())
+func (o *ops) readyz(w http.ResponseWriter, r *http.Request) {
+	if reason := o.notReady(r.Context()); reason != "" {
+		plain(w, http.StatusServiceUnavailable, "not ready")
 		return
 	}
+	plain(w, http.StatusOK, "ready")
+}
 
-	state, err := a.db.MigrationState(ctx)
+func (o *ops) notReady(ctx context.Context) string {
+	if err := o.db.Read.PingContext(ctx); err != nil {
+		return "database unreachable: " + err.Error()
+	}
+
+	state, err := o.db.MigrationState(ctx)
 	if err != nil {
-		plain(w, http.StatusServiceUnavailable, "migration state unknown: "+err.Error())
-		return
+		return "migration state unknown: " + err.Error()
 	}
 	if !state.UpToDate() {
-		plain(w, http.StatusServiceUnavailable, "schema is behind; migrations pending")
+		return fmt.Sprintf("schema is at %d, this binary knows %d", state.Applied, state.Latest)
+	}
+	return ""
+}
+
+func (o *ops) metrics(w http.ResponseWriter, r *http.Request) {
+	if o.token == "" {
+		http.NotFound(w, r)
 		return
 	}
 
-	plain(w, http.StatusOK, "ready")
+	sent := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if sent == "" {
+		sent = r.URL.Query().Get("token")
+	}
+	if subtle.ConstantTimeCompare([]byte(o.token), []byte(sent)) != 1 {
+		w.Header().Set("WWW-Authenticate", `Bearer realm="metrics"`)
+		plain(w, http.StatusUnauthorized, "a token is required")
+		return
+	}
+
+	promhttp.HandlerFor(o.registry, promhttp.HandlerOpts{}).ServeHTTP(w, r)
+}
+
+func (o *ops) heapProfile(w http.ResponseWriter, r *http.Request) {
+	if o.token == "" || subtle.ConstantTimeCompare([]byte(o.token), []byte(r.URL.Query().Get("token"))) != 1 {
+		http.NotFound(w, r)
+		return
+	}
+	pprof.Handler("heap").ServeHTTP(w, r)
 }
 
 func plain(w http.ResponseWriter, status int, body string) {

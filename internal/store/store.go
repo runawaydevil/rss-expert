@@ -12,10 +12,9 @@ import (
 )
 
 const (
-	writerCacheKiB = 20000
-	readerCacheKiB = 8000
-	readerConns    = 4
-	busyTimeoutMS  = 5000
+	DefaultCacheMiB = 20
+	readerConns     = 4
+	busyTimeoutMS   = 5000
 )
 
 type DB struct {
@@ -25,9 +24,19 @@ type DB struct {
 }
 
 func Open(ctx context.Context, path string) (*DB, error) {
+	return OpenWith(ctx, path, DefaultCacheMiB)
+}
+
+func OpenWith(ctx context.Context, path string, cacheMiB int) (*DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return nil, fmt.Errorf("store: create data directory: %w", err)
 	}
+	if cacheMiB <= 0 {
+		cacheMiB = DefaultCacheMiB
+	}
+
+	writerCacheKiB := cacheMiB * 1024
+	readerCacheKiB := writerCacheKiB * 2 / 5
 
 	write, err := open(ctx, path, writerCacheKiB)
 	if err != nil {

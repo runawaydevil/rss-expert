@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"time"
 
 	"github.com/runawaydevil/rss-expert/internal/config"
@@ -38,7 +39,7 @@ func serve(ctx context.Context, args []string) error {
 	log := cfg.Logger(os.Stdout)
 	log.Info("starting", "version", versionString(), "domain", cfg.Domain, "data", cfg.DataDir)
 
-	db, err := store.Open(ctx, cfg.DatabasePath())
+	db, err := store.OpenWith(ctx, cfg.DatabasePath(), cfg.CacheMiB)
 	if err != nil {
 		return err
 	}
@@ -54,10 +55,12 @@ func serve(ctx context.Context, args []string) error {
 	}
 
 	instance := web.New(db, log, "https://"+cfg.Domain, web.Options{
-		MediaRoot:   filepath.Join(cfg.DataDir, "media"),
-		MediaQuota:  cfg.MediaQuota,
-		BehindProxy: cfg.BehindProxy,
-		ShowPreview: cfg.ShowPreview,
+		MediaRoot:    filepath.Join(cfg.DataDir, "media"),
+		MediaQuota:   cfg.MediaQuota,
+		BehindProxy:  cfg.BehindProxy,
+		ShowPreview:  cfg.ShowPreview,
+		Version:      version,
+		MetricsToken: cfg.MetricsToken,
 	})
 
 	app := &http.Server{
@@ -66,13 +69,6 @@ func serve(ctx context.Context, args []string) error {
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
-	admin := &http.Server{
-		Addr:              cfg.AdminListen,
-		Handler:           web.NewAdmin(db, version).Handler(),
-		ReadHeaderTimeout: 10 * time.Second,
-		IdleTimeout:       120 * time.Second,
-	}
-
 	deliveryCtx, stopDelivery := context.WithCancel(ctx)
 	defer stopDelivery()
 	go web.NewDeliverer(instance).Run(deliveryCtx)
@@ -95,17 +91,16 @@ func serve(ctx context.Context, args []string) error {
 		log:      log,
 	}.run(upkeepCtx)
 
-	errs := make(chan error, 2)
+	errs := make(chan error, 1)
 	go listen(app, "app", cfg.Listen, log, errs)
-	go listen(admin, "admin", cfg.AdminListen, log, errs)
 
 	select {
 	case err := <-errs:
-		shutdown(app, admin)
+		shutdown(app)
 		return err
 	case <-ctx.Done():
 		log.Info("shutting down")
-		shutdown(app, admin)
+		shutdown(app)
 		return nil
 	}
 }
@@ -129,6 +124,7 @@ func prepareSchema(ctx context.Context, db *store.DB, log logger, refuse bool) e
 		return err
 	}
 	log.Info("schema ready", "version", state.Latest, "applied", len(applied))
+	debug.FreeOSMemory()
 	return nil
 }
 

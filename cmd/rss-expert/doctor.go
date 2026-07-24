@@ -68,11 +68,10 @@ func checkAll(ctx context.Context, cfg config.Config) []check {
 		checks = append(checks,
 			check{name: "instance", detail: "not running"},
 			checkListener("app port", cfg.Listen),
-			checkListener("admin port", cfg.AdminListen),
 		)
 	}
 
-	db, err := store.Open(ctx, cfg.DatabasePath())
+	db, err := store.OpenWith(ctx, cfg.DatabasePath(), cfg.CacheMiB)
 	if err != nil {
 		return append(checks, check{name: "database", err: err})
 	}
@@ -128,7 +127,7 @@ func instanceIsRunning(ctx context.Context, cfg config.Config) (bool, string) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	url := "http://" + dialableAddress(cfg.AdminListen) + "/readyz"
+	url := "http://" + dialableAddress(cfg.Listen) + "/readyz"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return false, ""
@@ -141,9 +140,9 @@ func instanceIsRunning(ctx context.Context, cfg config.Config) (bool, string) {
 	io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<12))
 
 	if resp.StatusCode == http.StatusOK {
-		return true, "running and ready, admin on " + cfg.AdminListen
+		return true, "running and ready on " + cfg.Listen
 	}
-	return true, fmt.Sprintf("running but not ready, admin on %s returned %d", cfg.AdminListen, resp.StatusCode)
+	return true, fmt.Sprintf("running but not ready; %s returned %d", cfg.Listen, resp.StatusCode)
 }
 
 func checkListener(name, address string) check {
@@ -206,8 +205,11 @@ func describeLimits(cfg config.Config) string {
 	if cfg.ShowPreview {
 		preview = ", /dev/preview on"
 	}
-	return fmt.Sprintf("quota %d MiB, fetch %d MiB, %d poll workers, %s%s",
-		cfg.MediaQuota>>20, cfg.FetchLimit>>20, cfg.PollWorkers, proxy, preview)
+	if cfg.MetricsToken != "" {
+		preview += ", /metrics behind a token"
+	}
+	return fmt.Sprintf("quota %d MiB, fetch %d MiB, cache %d MiB, %d poll workers, %s%s",
+		cfg.MediaQuota>>20, cfg.FetchLimit>>20, cfg.CacheMiB, cfg.PollWorkers, proxy, preview)
 }
 
 func describePragmas(pragmas map[string]string) string {

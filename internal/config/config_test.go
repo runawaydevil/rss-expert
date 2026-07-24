@@ -14,8 +14,8 @@ func TestDefaults(t *testing.T) {
 	if c.Listen != ":11080" {
 		t.Errorf("Listen = %q", c.Listen)
 	}
-	if c.AdminListen != "127.0.0.1:11090" {
-		t.Errorf("AdminListen = %q, the admin panel must not default to a public address", c.AdminListen)
+	if c.MetricsToken != "" {
+		t.Error("metrics answer without a token by default; they must be off until one is set")
 	}
 	if c.LogLevel != slog.LevelInfo {
 		t.Errorf("LogLevel = %v", c.LogLevel)
@@ -28,7 +28,7 @@ func TestDefaults(t *testing.T) {
 func TestEnvironmentOverrides(t *testing.T) {
 	t.Setenv("RSS_EXPERT_DOMAIN", "example.org")
 	t.Setenv("RSS_EXPERT_LISTEN", ":9999")
-	t.Setenv("RSS_EXPERT_ADMIN_LISTEN", "127.0.0.1:9998")
+	t.Setenv("RSS_EXPERT_METRICS_TOKEN", "a-token")
 	t.Setenv("RSS_EXPERT_DATA_DIR", t.TempDir())
 	t.Setenv("RSS_EXPERT_LOG_FORMAT", "json")
 	t.Setenv("RSS_EXPERT_LOG_LEVEL", "debug")
@@ -37,8 +37,8 @@ func TestEnvironmentOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Domain != "example.org" || c.Listen != ":9999" || c.AdminListen != "127.0.0.1:9998" {
-		t.Errorf("addresses not read from environment: %+v", c)
+	if c.Domain != "example.org" || c.Listen != ":9999" || c.MetricsToken != "a-token" {
+		t.Errorf("not read from environment: %+v", c)
 	}
 	if c.LogFormat != "json" || c.LogLevel != slog.LevelDebug {
 		t.Errorf("logging not read from environment: %+v", c)

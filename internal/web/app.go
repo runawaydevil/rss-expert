@@ -34,6 +34,7 @@ type App struct {
 	queue       *jobs.Queue
 	ledger      *ledger.Ledger
 	auth        *auth
+	ops         *ops
 	log         *slog.Logger
 	domain      string
 	behindProxy bool
@@ -41,10 +42,12 @@ type App struct {
 }
 
 type Options struct {
-	MediaRoot   string
-	MediaQuota  int64
-	BehindProxy bool
-	ShowPreview bool
+	MediaRoot    string
+	MediaQuota   int64
+	BehindProxy  bool
+	ShowPreview  bool
+	Version      string
+	MetricsToken string
 }
 
 func NewApp(db *store.DB, log *slog.Logger, domain string) *App {
@@ -54,6 +57,9 @@ func NewApp(db *store.DB, log *slog.Logger, domain string) *App {
 func New(db *store.DB, log *slog.Logger, domain string, o Options) *App {
 	if o.MediaRoot == "" {
 		o.MediaRoot = filepath.Join(filepath.Dir(db.Path), "media")
+	}
+	if o.Version == "" {
+		o.Version = "0.0.1"
 	}
 
 	accounts := identity.NewStore(db)
@@ -77,6 +83,7 @@ func New(db *store.DB, log *slog.Logger, domain string, o Options) *App {
 		queue:       jobs.New(db),
 		ledger:      ledger.New(db),
 		auth:        newAuth(accounts, log, o.BehindProxy),
+		ops:         newOps(db, o.Version, o.MetricsToken),
 		log:         log,
 		domain:      domain,
 		behindProxy: o.BehindProxy,
@@ -115,7 +122,13 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /mark", a.auth.requireAccount(a.mark))
 	mux.HandleFunc("POST /collections", a.auth.requireAccount(a.collections))
 
+	mux.HandleFunc("GET /healthz", a.ops.healthz)
+	mux.HandleFunc("GET /readyz", a.ops.readyz)
+	mux.HandleFunc("GET /metrics", a.ops.metrics)
+	mux.HandleFunc("GET /debug/heap", a.ops.heapProfile)
+
 	mux.HandleFunc("GET /rules", a.rules)
+	mux.HandleFunc("GET /admin/status", a.requireModerator(a.statusPage))
 	mux.HandleFunc("GET /admin", a.requireModerator(a.adminPanel))
 	mux.HandleFunc("POST /admin/report", a.requireModerator(a.decideReport))
 	mux.HandleFunc("POST /admin/block", a.auth.requireAccount(a.blockSomething))

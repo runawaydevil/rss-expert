@@ -352,3 +352,27 @@ func (s *Store) HealthFor(ctx context.Context, sourceIDs []int64) ([]Health, err
 	}
 	return out, rows.Err()
 }
+
+func (s *Store) Failing(ctx context.Context, limit int) ([]Health, error) {
+	rows, err := s.db.Read.QueryContext(ctx,
+		`select id from source
+		 where failure_count > 0 or quarantined_at is not null
+		 order by failure_count desc, id limit ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return s.HealthFor(ctx, ids)
+}

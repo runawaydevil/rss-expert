@@ -14,6 +14,9 @@ var writers = sync.Pool{
 }
 
 func compressible(mediaType string) bool {
+	mediaType, _, _ = strings.Cut(mediaType, ";")
+	mediaType = strings.TrimSpace(strings.ToLower(mediaType))
+
 	switch {
 	case strings.HasPrefix(mediaType, "text/"),
 		strings.HasSuffix(mediaType, "+xml"),
