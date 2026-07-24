@@ -8,7 +8,9 @@ conversations over plain RSS -- in real time, in both directions, with no API
 required to participate. The timeline separates what was written here from what
 arrived from elsewhere, and keeps where every post came from.
 
-Single static binary, single SQLite file, single container. No JavaScript.
+Single static binary, single SQLite file, single container. The only JavaScript
+is a 20-line island that reveals a "new posts" banner; every page works without
+it.
 
 Status: 0.0.1. Everything below works and is covered by tests.
 
@@ -84,6 +86,36 @@ Commands
     rss-expert version
 
 
+Behind a proxy
+--------------
+
+The timeline holds one long-lived connection to /events, so the proxy must not
+buffer it. For nginx:
+
+    location / {
+        proxy_pass http://127.0.0.1:11081;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location /events {
+        proxy_pass http://127.0.0.1:11081;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 1h;
+    }
+
+The app also sends X-Accel-Buffering: no on that endpoint, which nginx honours
+on its own -- the explicit block is belt and braces. Set BEHIND_PROXY=true so
+the forwarded headers are trusted.
+
+
 Operating
 ---------
 
@@ -124,8 +156,12 @@ name that resolves to a private address is refused even mid-redirect. Uploads
 are typed by their magic bytes, decoded before they are stored, and stripped of
 EXIF and PNG text chunks without re-encoding a single pixel. Sessions and
 tokens are stored hashed; passwords use argon2id. A TOTP code cannot be used
-twice. Pages carry Content-Security-Policy default-src 'none', and there is no
-script anywhere that would need it relaxed.
+twice. The public federation endpoints -- the hub, the cloud registration,
+Webmention and Micropub -- are rate limited per address, so a stranger cannot
+use them to hammer a third party or to fill the disk. Pages carry
+Content-Security-Policy default-src 'none' plus script-src 'self'; the only
+script is the twenty-line island, served from this origin, and no page carries
+an inline one.
 
 
 Credits

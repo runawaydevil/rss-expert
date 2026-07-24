@@ -11,11 +11,15 @@ import (
 )
 
 func (a *App) registerForm(w http.ResponseWriter, r *http.Request) {
-	if a.registration == "closed" {
-		a.renderRegister(w, r, "", "This instance is not taking new accounts.", false)
+	email := r.URL.Query().Get("email")
+	if a.registration == "closed" && email == "" {
+		a.render(w, r, "register.html", map[string]any{
+			"Title":  "Create an account — RSS Expert",
+			"Closed": true,
+		})
 		return
 	}
-	a.renderRegister(w, r, r.URL.Query().Get("email"), "", false)
+	a.renderRegister(w, r, email, "", false)
 }
 
 func (a *App) submitRegister(w http.ResponseWriter, r *http.Request) {
@@ -23,10 +27,6 @@ func (a *App) submitRegister(w http.ResponseWriter, r *http.Request) {
 
 	if err := r.ParseForm(); err != nil || !validCSRF(r) {
 		a.renderRegister(w, r, "", "That form expired. Try again.", false)
-		return
-	}
-	if a.registration == "closed" {
-		a.renderRegister(w, r, "", "This instance is not taking new accounts.", false)
 		return
 	}
 	if !a.auth.attempts.allow(clientIP(r, a.behindProxy)) {
@@ -38,7 +38,7 @@ func (a *App) submitRegister(w http.ResponseWriter, r *http.Request) {
 	password := r.PostFormValue("password")
 	invite := strings.TrimSpace(r.PostFormValue("invite"))
 
-	if a.registration == "invite" {
+	if a.registration != "open" {
 		token, err := a.accounts.RedeemToken(ctx, invite, identity.PurposeInvite)
 		if err != nil || !strings.EqualFold(token.Email, email) {
 			a.renderRegister(w, r, email, "That invitation is not valid for this address.", true)
@@ -53,14 +53,14 @@ func (a *App) submitRegister(w http.ResponseWriter, r *http.Request) {
 		a.renderRegister(w, r, email, "If that address is free, your account is created. Check your mail.", false)
 		return
 	case errors.Is(err, identity.ErrPasswordTooShort):
-		a.renderRegister(w, r, email, err.Error(), a.registration == "invite")
+		a.renderRegister(w, r, email, err.Error(), a.registration != "open")
 		return
 	case errors.Is(err, identity.ErrEmailUnusable):
-		a.renderRegister(w, r, email, "That does not look like an email address.", a.registration == "invite")
+		a.renderRegister(w, r, email, "That does not look like an email address.", a.registration != "open")
 		return
 	case err != nil:
 		a.log.Error("could not create an account", "error", err)
-		a.renderRegister(w, r, email, "It could not be created. Try again.", a.registration == "invite")
+		a.renderRegister(w, r, email, "It could not be created. Try again.", a.registration != "open")
 		return
 	}
 
@@ -269,8 +269,7 @@ func (a *App) renderRegister(w http.ResponseWriter, r *http.Request, email, prob
 		"Title":   "Create an account — RSS Expert",
 		"Email":   email,
 		"Problem": problem,
-		"Invite":  a.registration == "invite",
-		"Closed":  a.registration == "closed",
+		"Invite":  a.registration != "open",
 	}
 	if keepInvite {
 		data["InviteToken"] = r.PostFormValue("invite")

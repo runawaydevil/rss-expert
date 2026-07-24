@@ -42,6 +42,8 @@ type App struct {
 	fetcher      *safety.Fetcher
 	push         *push.Store
 	mail         *mail.Sender
+	live         *liveGate
+	federation   *limiter
 	poller       *poller.Poller
 	log          *slog.Logger
 	domain       string
@@ -104,6 +106,8 @@ func New(db *store.DB, log *slog.Logger, domain string, o Options) *App {
 		fetcher:    newFetcher(domain, o.FetchLimit, o.ReachPrivate),
 		push:       push.New(db),
 		mail:       o.Mailer,
+		live:       newLiveGate(liveMaxClients),
+		federation: newLimiter(30, 120),
 		poller: poller.New(sources, log, poller.Options{
 			UserAgent:         "rss-expert (+" + domain + ")",
 			AllowPrivateAddrs: o.ReachPrivate,
@@ -121,6 +125,7 @@ func New(db *store.DB, log *slog.Logger, domain string, o Options) *App {
 func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", a.timeline)
+	mux.HandleFunc("GET /events", a.events)
 	mux.HandleFunc("GET /login", a.auth.login)
 	mux.HandleFunc("POST /login", a.auth.submitLogin)
 	mux.HandleFunc("POST /logout", a.auth.logout)
@@ -148,16 +153,16 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /p/{id}/replies.xml", a.repliesFeed)
 	mux.HandleFunc("GET /p/{id}/journey", a.journey)
 
-	mux.HandleFunc("POST /webmention", a.receiveWebmention)
+	mux.HandleFunc("POST /webmention", a.throttle(a.receiveWebmention))
 
 	mux.HandleFunc("GET /websub/{source}", a.websubCallback)
 	mux.HandleFunc("POST /websub/{source}", a.websubCallback)
-	mux.HandleFunc("POST /websub/hub", a.hubEndpoint)
+	mux.HandleFunc("POST /websub/hub", a.throttle(a.hubEndpoint))
 	mux.HandleFunc("GET /rsscloud/{source}", a.cloudCallback)
 	mux.HandleFunc("POST /rsscloud/{source}", a.cloudCallback)
-	mux.HandleFunc("POST /rsscloud/pleaseNotify", a.cloudRegister)
+	mux.HandleFunc("POST /rsscloud/pleaseNotify", a.throttle(a.cloudRegister))
 	mux.HandleFunc("GET /micropub", a.micropubEndpoint)
-	mux.HandleFunc("POST /micropub", a.micropubEndpoint)
+	mux.HandleFunc("POST /micropub", a.throttle(a.micropubEndpoint))
 
 	mux.HandleFunc("GET /sources", a.sourcesPage)
 	mux.HandleFunc("POST /sources", a.auth.requireAccount(a.subscribe))
@@ -188,7 +193,7 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /settings/two-factor/off", a.auth.requireAccount(a.disableTwoFactor))
 
 	mux.HandleFunc("GET /media/{sha}", a.serveMedia)
-	mux.HandleFunc("POST /micropub/media", a.micropubMedia)
+	mux.HandleFunc("POST /micropub/media", a.throttle(a.micropubMedia))
 	mux.HandleFunc("GET /settings/tokens", a.auth.requireAccount(a.tokenSettings))
 	mux.HandleFunc("POST /settings/tokens", a.auth.requireAccount(a.issueToken))
 	mux.HandleFunc("POST /settings/tokens/revoke", a.auth.requireAccount(a.revokeToken))
@@ -252,7 +257,7 @@ func securityHeaders(next http.Handler) http.Handler {
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Content-Security-Policy",
 			"default-src 'none'; img-src 'self' data:; style-src 'self'; font-src 'self'; "+
-				"media-src 'self'; "+
+				"media-src 'self'; script-src 'self'; connect-src 'self'; "+
 				"form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
 		next.ServeHTTP(w, r)
 	})

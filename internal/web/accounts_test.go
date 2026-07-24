@@ -293,3 +293,53 @@ func tokenOf(link string) string {
 	_, after, _ := strings.Cut(link, "token=")
 	return after
 }
+
+func TestTheOwnerInvitesSomeoneIntoAClosedInstance(t *testing.T) {
+	h, accounts, box := accountsApp(t, "closed")
+	ctx := context.Background()
+
+	owner := signedInAs(t, h, accounts, "owner@example.org", identity.RoleOwner)
+
+	csrf, cookies := csrfFrom(t, h, "/admin", owner)
+	resp := postForm(t, h, "/admin/invite", url.Values{
+		"csrf": {csrf}, "email": {"friend@example.org"},
+	}, cookies)
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("inviting gave %d", resp.StatusCode)
+	}
+
+	body := box.waitForMail(t)
+	m := regexp.MustCompile(`Invitation code: (\S+)`).FindStringSubmatch(body)
+	if m == nil {
+		t.Fatalf("no invitation code in the mail:\n%s", body)
+	}
+
+	page := getAs(t, h, "/register?email=friend@example.org", nil)
+	pageBody, _ := io.ReadAll(page.Body)
+	if !strings.Contains(string(pageBody), `name="invite"`) {
+		t.Fatalf("the invitation link did not open the form:\n%s", pageBody)
+	}
+
+	formCSRF, formCookies := csrfFrom(t, h, "/register?email=friend@example.org", nil)
+	created := postForm(t, h, "/register", url.Values{
+		"csrf": {formCSRF}, "email": {"friend@example.org"},
+		"password": {"a long enough password"}, "invite": {m[1]},
+	}, formCookies)
+	if created.StatusCode != http.StatusOK {
+		out, _ := io.ReadAll(created.Body)
+		t.Fatalf("registering with a valid invitation gave %d: %s", created.StatusCode, out)
+	}
+
+	if _, err := accounts.ByEmail(ctx, "friend@example.org"); err != nil {
+		t.Errorf("the invited account was not created: %v", err)
+	}
+
+	stranger := postForm(t, h, "/register", url.Values{
+		"csrf": {formCSRF}, "email": {"stranger@example.org"},
+		"password": {"a long enough password"}, "invite": {"made-up-code"},
+	}, formCookies)
+	_ = stranger
+	if _, err := accounts.ByEmail(ctx, "stranger@example.org"); err == nil {
+		t.Error("a stranger got in without a real invitation")
+	}
+}

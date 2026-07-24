@@ -1,8 +1,10 @@
 {{template "head" .}}
-<body>
+<body{{if .Latest}} data-latest="{{.Latest}}"{{end}}>
 <a class="skip" href="#reader">Skip to the posts</a>
 
 <div class="page">
+	<a id="fresh" class="fresh" href="" hidden>New posts arrived — show them</a>
+
 	<header class="masthead">
 		<a class="wordmark" href="/"><img src="{{asset "mark.png"}}" alt="" width="40" height="40" decoding="async"> rss&#8202;expert</a>
 
@@ -136,5 +138,6 @@
 </div>
 
 {{template "colophon" .}}
+{{if .Latest}}<script src="{{asset "live.js"}}" defer></script>{{end}}
 </body>
 </html>

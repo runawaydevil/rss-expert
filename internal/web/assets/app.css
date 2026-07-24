@@ -1512,3 +1512,20 @@ a {
 	height: auto;
 	margin: 0 auto var(--space-3);
 }
+
+.fresh {
+	position: sticky;
+	top: var(--space-3);
+	z-index: 10;
+	display: block;
+	width: fit-content;
+	margin: 0 auto var(--space-3);
+	padding: var(--space-2) var(--space-5);
+	font-family: var(--font-state);
+	font-size: var(--text-sm);
+	background: var(--accent-wash);
+	color: var(--ink);
+	border: 2px solid var(--ink);
+	border-radius: var(--radius-pill);
+	text-decoration: none;
+}

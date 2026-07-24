@@ -80,10 +80,16 @@ func (a *App) timeline(w http.ResponseWriter, r *http.Request) {
 		a.log.Error("could not read the timeline", "error", err)
 	}
 
+	latest, err := a.sources.Newest(ctx)
+	if err != nil {
+		a.log.Error("could not read the newest item time", "error", err)
+	}
+
 	data := map[string]any{
 		"Title":  "RSS Expert",
 		"Posts":  a.decorate(ctx, account, items),
 		"View":   name,
+		"Latest": latest,
 		"Scope":  string(scope),
 		"Label":  label,
 		"Search": search,

@@ -41,7 +41,7 @@ func acceptsGzip(r *http.Request) bool {
 
 func compressed(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !acceptsGzip(r) {
+		if !acceptsGzip(r) || r.URL.Path == "/events" {
 			next.ServeHTTP(w, r)
 			return
 		}

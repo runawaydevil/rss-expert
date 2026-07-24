@@ -260,20 +260,29 @@ func TestLoginIsRateLimited(t *testing.T) {
 	}
 }
 
-func TestContentSecurityPolicyForbidsScript(t *testing.T) {
+func TestScriptRunsOnlyFromThisOrigin(t *testing.T) {
 	h, _ := testAppWithAccounts(t)
 	csp := get(t, h, "/").Header.Get("Content-Security-Policy")
 
 	if !strings.Contains(csp, "default-src 'none'") {
 		t.Errorf("CSP = %q", csp)
 	}
-	if strings.Contains(csp, "script-src") && !strings.Contains(csp, "script-src 'none'") {
-		t.Errorf("CSP allows script somewhere: %q", csp)
+	if !strings.Contains(csp, "script-src 'self'") {
+		t.Errorf("the live island needs script-src 'self': %q", csp)
+	}
+	for _, loose := range []string{"unsafe-inline", "unsafe-eval", "https:", "*"} {
+		if strings.Contains(csp, loose) {
+			t.Errorf("the CSP loosened to %q: %q", loose, csp)
+		}
 	}
 
-	body, _ := io.ReadAll(get(t, h, "/dev/preview").Body)
-	if strings.Contains(string(body), "<script") {
-		t.Error("the page carries a script tag but the CSP forbids running one")
+	for _, path := range []string{"/", "/dev/preview", "/login", "/rules"} {
+		body, _ := io.ReadAll(get(t, h, path).Body)
+		for _, tag := range strings.Split(string(body), "<script")[1:] {
+			if !strings.HasPrefix(strings.TrimSpace(tag), "src=") {
+				t.Errorf("%s carries an inline script; only src'd scripts are allowed:\n<script%.80s", path, tag)
+			}
+		}
 	}
 }
 

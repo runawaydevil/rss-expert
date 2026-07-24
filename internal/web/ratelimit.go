@@ -78,3 +78,16 @@ func clientIP(r *http.Request, behindProxy bool) string {
 	}
 	return host
 }
+
+func (a *App) throttle(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !a.federation.allow(clientIP(r, a.behindProxy)) {
+			a.log.Warn("federation rate limit reached",
+				"ip", clientIP(r, a.behindProxy), "path", r.URL.Path)
+			w.Header().Set("Retry-After", "60")
+			http.Error(w, "too many requests", http.StatusTooManyRequests)
+			return
+		}
+		next(w, r)
+	}
+}

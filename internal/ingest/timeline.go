@@ -400,3 +400,10 @@ func (s *Store) Failing(ctx context.Context, limit int) ([]Health, error) {
 	}
 	return s.HealthFor(ctx, ids)
 }
+
+func (s *Store) Newest(ctx context.Context) (int64, error) {
+	var at sql.NullInt64
+	err := s.db.Read.QueryRowContext(ctx,
+		`select max(coalesce(published_at, converged_at)) from logical_item`).Scan(&at)
+	return at.Int64, err
+}
