@@ -259,3 +259,68 @@ func nullable(s string) any {
 	}
 	return s
 }
+
+func (s *Store) RemoveSource(ctx context.Context, id int64) error {
+	orphaned, err := s.itemsWinningOn(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	if _, err := s.db.Write.ExecContext(ctx,
+		`delete from logical_item where winner_id in
+		 (select id from observation where source_id = ?)`, id); err != nil {
+		return fmt.Errorf("ingest: detach items: %w", err)
+	}
+	if _, err := s.db.Write.ExecContext(ctx, `delete from source where id = ?`, id); err != nil {
+		return fmt.Errorf("ingest: remove source: %w", err)
+	}
+
+	now := time.Now().UTC()
+	for _, key := range orphaned {
+		if _, err := s.Converge(ctx, key, now); err != nil {
+			return fmt.Errorf("ingest: reconverge %s: %w", key, err)
+		}
+		if err := s.forget(ctx, key); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Store) itemsWinningOn(ctx context.Context, sourceID int64) ([]string, error) {
+	rows, err := s.db.Read.QueryContext(ctx,
+		`select l.item_key from logical_item l
+		 join observation o on o.id = l.winner_id
+		 where o.source_id = ?`, sourceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var keys []string
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, err
+		}
+		keys = append(keys, key)
+	}
+	return keys, rows.Err()
+}
+
+func (s *Store) forget(ctx context.Context, key string) error {
+	var exists int
+	err := s.db.Read.QueryRowContext(ctx,
+		`select count(*) from logical_item where item_key = ?`, key).Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if exists > 0 {
+		return nil
+	}
+	if _, err := s.db.Write.ExecContext(ctx,
+		`delete from item_search where item_key = ?`, key); err != nil {
+		return fmt.Errorf("ingest: forget %s: %w", key, err)
+	}
+	return nil
+}

@@ -72,6 +72,7 @@ Commands
     rss-expert restore --from DIR           into an empty data directory
     rss-expert restore --from DIR --check   verify without changing anything
     rss-expert sources add URL              subscribe from the shell
+                                            (the browser does this too, at /sources)
     rss-expert version
 
 

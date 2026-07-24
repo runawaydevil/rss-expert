@@ -3,8 +3,12 @@ package web
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"runtime"
 	"time"
+
+	"github.com/runawaydevil/rss-expert/internal/backup"
 )
 
 type gauge struct {
@@ -61,6 +65,9 @@ func (a *App) statusPage(w http.ResponseWriter, r *http.Request) {
 		"Readings": readings,
 		"Failing":  failing,
 		"Metrics":  a.ops.token != "",
+		"Backups":  a.backups(),
+		"CanBack":  a.dataDir != "",
+		"Problem":  r.URL.Query().Get("problem"),
 	})
 }
 
@@ -85,4 +92,65 @@ func heapInUse() int64 {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 	return int64(m.HeapInuse)
+}
+
+func (a *App) takeBackup(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil || !validCSRF(r) {
+		http.Redirect(w, r, "/admin/status", http.StatusSeeOther)
+		return
+	}
+	if a.dataDir == "" {
+		a.log.Error("a backup was asked for but this instance has no data directory configured")
+		http.Redirect(w, r, "/admin/status", http.StatusSeeOther)
+		return
+	}
+
+	stamp := time.Now().UTC().Format("2006-01-02-1504")
+	into := filepath.Join(a.dataDir, "backups", stamp)
+
+	manifest, err := backup.TakeWithMedia(r.Context(), a.db, into, a.ops.version, filepath.Join(a.dataDir, "media"))
+	if err != nil {
+		a.log.Error("backup failed", "into", into, "error", err)
+		http.Redirect(w, r, "/admin/status?problem="+urlEscape(err.Error()), http.StatusSeeOther)
+		return
+	}
+
+	a.log.Info("backup taken", "into", into, "files", len(manifest.Files), "uploads", len(manifest.Media),
+		"by", accountFrom(r.Context()).Email)
+	http.Redirect(w, r, "/admin/status", http.StatusSeeOther)
+}
+
+func (a *App) backups() []gauge {
+	if a.dataDir == "" {
+		return nil
+	}
+
+	entries, err := os.ReadDir(filepath.Join(a.dataDir, "backups"))
+	if err != nil {
+		return nil
+	}
+
+	out := make([]gauge, 0, len(entries))
+	for i := len(entries) - 1; i >= 0 && len(out) < 10; i-- {
+		if !entries[i].IsDir() {
+			continue
+		}
+		where := filepath.Join(a.dataDir, "backups", entries[i].Name())
+		taken, err := backup.Verify(where)
+		if err != nil {
+			out = append(out, gauge{Label: entries[i].Name(), Value: "damaged", Detail: err.Error(), Bad: true})
+			continue
+		}
+
+		var total int64
+		for _, file := range append(append([]backup.File{}, taken.Files...), taken.Media...) {
+			total += file.Bytes
+		}
+		out = append(out, gauge{
+			Label:  entries[i].Name(),
+			Value:  mib(total),
+			Detail: fmt.Sprintf("schema %d, %d uploads, verified just now", taken.SchemaVersion, len(taken.Media)),
+		})
+	}
+	return out
 }

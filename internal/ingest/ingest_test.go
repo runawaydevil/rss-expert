@@ -3,6 +3,7 @@ package ingest
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -457,5 +458,80 @@ func TestStoredPayloadsAreDroppedOnceNothingRefersToThem(t *testing.T) {
 		t.Fatal(err)
 	} else if n != 0 {
 		t.Errorf("a second sweep removed %d more rows", n)
+	}
+}
+
+func TestRemovingASourceKeepsWhatOthersAlsoSaw(t *testing.T) {
+	ctx := context.Background()
+	s := testStore(t)
+
+	shared := `<?xml version="1.0"?>
+	<rss version="2.0"><channel><title>%s</title><link>https://a.example/</link>
+	<description>d</description>
+	<item><title>Shared post</title><link>https://origin.example/1</link>
+	<guid isPermaLink="true">https://origin.example/1</guid>
+	<pubDate>Mon, 20 Jul 2026 10:00:00 GMT</pubDate></item>
+	</channel></rss>`
+
+	for _, name := range []string{"first", "second"} {
+		source, err := s.AddSource(ctx, "https://"+name+".example/rss.xml")
+		if err != nil {
+			t.Fatal(err)
+		}
+		body := []byte(fmt.Sprintf(shared, name))
+		parsed, err := feedin.Parse(body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.Ingest(ctx, source, body, "application/rss+xml", parsed); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	first, err := s.SourceByURL(ctx, "https://first.example/rss.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.RemoveSource(ctx, first.ID); err != nil {
+		t.Fatalf("removing a source failed: %v", err)
+	}
+
+	if _, err := s.Item(ctx, "https://origin.example/1"); err != nil {
+		t.Errorf("the item vanished even though another source still carries it: %v", err)
+	}
+
+	list, err := s.Sources(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 {
+		t.Errorf("%d sources remain, want 1", len(list))
+	}
+}
+
+func TestRemovingTheOnlySourceTakesItsItems(t *testing.T) {
+	ctx := context.Background()
+	s := testStore(t)
+
+	source, _ := ingestCorpus(t, s, "https://rss.chat/users/rss.xml", "rsschat-firehose.xml")
+
+	_, _, before, err := s.Counts(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before == 0 {
+		t.Fatal("nothing was ingested")
+	}
+
+	if err := s.RemoveSource(ctx, source.ID); err != nil {
+		t.Fatalf("removing the source failed: %v", err)
+	}
+
+	_, observations, items, err := s.Counts(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if observations != 0 || items != 0 {
+		t.Errorf("after removing the only source: %d observations, %d items", observations, items)
 	}
 }

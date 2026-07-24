@@ -17,6 +17,41 @@
 		<p class="lead">Every feed this instance reads. Health is shown here because a feed that
 		dies quietly is the main way a reader lies to you.</p>
 
+		{{if .Problem}}
+		<p class="form-problem" role="alert">{{.Problem}}</p>
+		{{end}}
+
+		{{if .Account}}
+		<section class="block">
+			<h2>Follow something</h2>
+			<form class="panel form" method="post" action="/sources">
+				<input type="hidden" name="csrf" value="{{.CSRF}}">
+				<label for="url">Address <span class="optional">a feed, or the site itself and we look for one</span></label>
+				<input id="url" name="url" type="text" value="{{.Draft}}" required autocomplete="off"
+					inputmode="url" spellcheck="false" placeholder="example.org">
+				<button type="submit" class="button-primary">Follow</button>
+				<p class="form-aside">It is read once straight away, so you see whether it works
+				before walking away.</p>
+			</form>
+
+			{{if .Choices}}
+			<h2>That page offers more than one</h2>
+			<ul class="choices">
+				{{range .Choices}}
+				<li>
+					<form method="post" action="/sources">
+						<input type="hidden" name="csrf" value="{{$.CSRF}}">
+						<input type="hidden" name="url" value="{{.URL}}">
+						<button type="submit" class="button-quiet">{{.Title}}</button>
+						<span class="note">{{.Kind}} · {{.URL}}</span>
+					</form>
+				</li>
+				{{end}}
+			</ul>
+			{{end}}
+		</section>
+		{{end}}
+
 		{{if .Sources}}
 		<ul class="source-list">
 			{{range .Sources}}
@@ -34,12 +69,27 @@
 				{{else}}
 				<p class="source-detail">Read every {{.Every}}.</p>
 				{{end}}
+				{{if $.Account}}
+				<p class="source-actions">
+					<form method="post" action="/sources/refresh">
+						<input type="hidden" name="csrf" value="{{$.CSRF}}">
+						<input type="hidden" name="source" value="{{.ID}}">
+						<button type="submit" class="button-quiet"
+							data-tip="Read it now instead of waiting for the schedule.">Read now</button>
+					</form>
+					<form method="post" action="/sources/remove">
+						<input type="hidden" name="csrf" value="{{$.CSRF}}">
+						<input type="hidden" name="source" value="{{.ID}}">
+						<button type="submit" class="button-quiet"
+							data-tip="Stop following it. Everything already read stays where it is.">Unfollow</button>
+					</form>
+				</p>
+				{{end}}
 			</li>
 			{{end}}
 		</ul>
 		{{else}}
-		<p class="empty">This instance follows nothing yet. Add a feed with
-		<code>rss-expert sources add &lt;url&gt;</code>, or import an outline below.</p>
+		<p class="empty">This instance follows nothing yet.</p>
 		{{end}}
 
 		<section class="block">

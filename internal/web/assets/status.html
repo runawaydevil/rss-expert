@@ -13,6 +13,10 @@
 		<p class="lead">What this instance is doing right now. Nobody sees this page without
 		signing in.</p>
 
+		{{if .Problem}}
+		<p class="form-problem" role="alert">{{.Problem}}</p>
+		{{end}}
+
 		<section class="block">
 			<ul class="readings">
 				{{range .Readings}}
@@ -41,6 +45,34 @@
 			<p class="lead">None. Every source answered the last time it was read.</p>
 			{{end}}
 		</section>
+
+		{{if .CanBack}}
+		<section class="block">
+			<h2>Backups</h2>
+			<p class="lead">A snapshot holds the database and every upload, and only copies what
+			changed since the last one. Keep a copy somewhere that is not this server.</p>
+
+			<form method="post" action="/admin/backup">
+				<input type="hidden" name="csrf" value="{{.CSRF}}">
+				<button type="submit" class="button-primary"
+					data-tip="Writes into the data directory, under backups, and verifies every file against its hash.">Take one now</button>
+			</form>
+
+			{{if .Backups}}
+			<ul class="readings">
+				{{range .Backups}}
+				<li class="reading{{if .Bad}} reading-bad{{end}}">
+					<span class="reading-label">{{.Label}}</span>
+					<span class="reading-value">{{.Value}}</span>
+					<span class="reading-detail">{{.Detail}}</span>
+				</li>
+				{{end}}
+			</ul>
+			{{else}}
+			<p class="note">None yet.</p>
+			{{end}}
+		</section>
+		{{end}}
 
 		<section class="block">
 			<h2>Machine readable</h2>

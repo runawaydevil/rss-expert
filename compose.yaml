@@ -12,8 +12,12 @@ services:
     # does not stop the container from starting. Inside, it is always 11080.
     ports:
       - "${RSS_EXPERT_HTTP_PORT:-11081}:11080"
+    # A named volume, so the data directory is created with the right owner for
+    # the unprivileged user this runs as. To keep the files on the host path
+    # instead, swap this for "./data:/data" and run, once:
+    #     mkdir -p data && sudo chown -R 65532:65532 data
     volumes:
-      - ./data:/data
+      - data:/data
     env_file:
       - .env
     environment:
@@ -22,3 +26,6 @@ services:
       RSS_EXPERT_DATA_DIR: /data
       RSS_EXPERT_LISTEN: :11080
       GOMEMLIMIT: 400MiB
+
+volumes:
+  data:

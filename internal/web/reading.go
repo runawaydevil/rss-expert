@@ -143,6 +143,10 @@ func (a *App) mark(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) sourcesPage(w http.ResponseWriter, r *http.Request) {
+	a.renderSources(w, r, "", "", nil)
+}
+
+func (a *App) renderSources(w http.ResponseWriter, r *http.Request, problem, draft string, choices []candidate) {
 	ctx := r.Context()
 
 	list, err := a.sources.Sources(ctx)
@@ -183,6 +187,9 @@ func (a *App) sourcesPage(w http.ResponseWriter, r *http.Request) {
 	a.render(w, r, "sources.html", map[string]any{
 		"Title":   "Sources — RSS Expert",
 		"Sources": rows,
+		"Problem": problem,
+		"Draft":   draft,
+		"Choices": choices,
 	})
 }
 

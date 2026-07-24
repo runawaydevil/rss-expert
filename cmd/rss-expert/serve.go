@@ -61,6 +61,8 @@ func serve(ctx context.Context, args []string) error {
 		ShowPreview:  cfg.ShowPreview,
 		Version:      version,
 		MetricsToken: cfg.MetricsToken,
+		FetchLimit:   cfg.FetchLimit,
+		DataDir:      cfg.DataDir,
 	})
 
 	app := &http.Server{

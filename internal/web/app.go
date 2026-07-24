@@ -14,8 +14,10 @@ import (
 	"github.com/runawaydevil/rss-expert/internal/media"
 	"github.com/runawaydevil/rss-expert/internal/micropub"
 	"github.com/runawaydevil/rss-expert/internal/moderation"
+	"github.com/runawaydevil/rss-expert/internal/poller"
 	"github.com/runawaydevil/rss-expert/internal/publish"
 	"github.com/runawaydevil/rss-expert/internal/reading"
+	"github.com/runawaydevil/rss-expert/internal/safety"
 	"github.com/runawaydevil/rss-expert/internal/store"
 	"github.com/runawaydevil/rss-expert/internal/webmention"
 )
@@ -35,10 +37,13 @@ type App struct {
 	ledger      *ledger.Ledger
 	auth        *auth
 	ops         *ops
+	fetcher     *safety.Fetcher
+	poller      *poller.Poller
 	log         *slog.Logger
 	domain      string
 	behindProxy bool
 	showPreview bool
+	dataDir     string
 }
 
 type Options struct {
@@ -48,6 +53,9 @@ type Options struct {
 	ShowPreview  bool
 	Version      string
 	MetricsToken string
+	FetchLimit   int64
+	ReachPrivate bool
+	DataDir      string
 }
 
 func NewApp(db *store.DB, log *slog.Logger, domain string) *App {
@@ -63,10 +71,12 @@ func New(db *store.DB, log *slog.Logger, domain string, o Options) *App {
 	}
 
 	accounts := identity.NewStore(db)
+	sources := ingest.NewStore(db)
+
 	return &App{
 		db:       db,
 		accounts: accounts,
-		sources:  ingest.NewStore(db),
+		sources:  sources,
 		posts:    publish.NewStore(db, domain),
 		sites: indieweb.NewStore(db, indieweb.Options{
 			Domain:    domain,
@@ -76,18 +86,25 @@ func New(db *store.DB, log *slog.Logger, domain string, o Options) *App {
 			Domain:    domain,
 			UserAgent: "rss-expert (+https://" + domain + ")",
 		}),
-		tokens:      micropub.New(db),
-		media:       media.New(db, media.Options{Root: o.MediaRoot, Quota: o.MediaQuota}),
-		reading:     reading.New(db),
-		moderation:  moderation.New(db),
-		queue:       jobs.New(db),
-		ledger:      ledger.New(db),
-		auth:        newAuth(accounts, log, o.BehindProxy),
-		ops:         newOps(db, o.Version, o.MetricsToken),
+		tokens:     micropub.New(db),
+		media:      media.New(db, media.Options{Root: o.MediaRoot, Quota: o.MediaQuota}),
+		reading:    reading.New(db),
+		moderation: moderation.New(db),
+		queue:      jobs.New(db),
+		ledger:     ledger.New(db),
+		auth:       newAuth(accounts, log, o.BehindProxy),
+		ops:        newOps(db, o.Version, o.MetricsToken),
+		fetcher:    newFetcher(domain, o.FetchLimit, o.ReachPrivate),
+		poller: poller.New(sources, log, poller.Options{
+			UserAgent:         "rss-expert (+" + domain + ")",
+			AllowPrivateAddrs: o.ReachPrivate,
+			MaxBytes:          o.FetchLimit,
+		}),
 		log:         log,
 		domain:      domain,
 		behindProxy: o.BehindProxy,
 		showPreview: o.ShowPreview,
+		dataDir:     o.DataDir,
 	}
 }
 
@@ -117,6 +134,9 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /micropub", a.micropubEndpoint)
 
 	mux.HandleFunc("GET /sources", a.sourcesPage)
+	mux.HandleFunc("POST /sources", a.auth.requireAccount(a.subscribe))
+	mux.HandleFunc("POST /sources/refresh", a.auth.requireAccount(a.refreshSource))
+	mux.HandleFunc("POST /sources/remove", a.auth.requireAccount(a.unsubscribe))
 	mux.HandleFunc("GET /subscriptions.opml", a.exportOPML)
 	mux.HandleFunc("POST /subscriptions.opml", a.auth.requireAccount(a.importOPML))
 	mux.HandleFunc("POST /mark", a.auth.requireAccount(a.mark))
@@ -129,6 +149,7 @@ func (a *App) Handler() http.Handler {
 
 	mux.HandleFunc("GET /rules", a.rules)
 	mux.HandleFunc("GET /admin/status", a.requireModerator(a.statusPage))
+	mux.HandleFunc("POST /admin/backup", a.requireModerator(a.takeBackup))
 	mux.HandleFunc("GET /admin", a.requireModerator(a.adminPanel))
 	mux.HandleFunc("POST /admin/report", a.requireModerator(a.decideReport))
 	mux.HandleFunc("POST /admin/block", a.auth.requireAccount(a.blockSomething))
