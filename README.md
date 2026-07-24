@@ -135,13 +135,26 @@ Interop
 In:   RSS 2.0, Atom, JSON Feed 1.0/1.1, h-feed, OPML, WebSub, rssCloud
 Out:  per-user RSS and JSON, instance firehose, per-post comment feeds, OPML
 Also: Webmention (send and receive), Micropub with a media endpoint,
-      domain as identity (rel=me and h-card, verified both ways)
+      domain as identity (rel=me and h-card, verified both ways),
+      ActivityPub, off by default
 
 Push works both ways. As a subscriber it discovers a feed's hub or cloud, keeps
 the subscription renewed, and takes deliveries verified by their signature. As a
 publisher it is its own hub and its own cloud: it advertises both in every feed
 and tells its subscribers the moment something is published. Feeds it cannot get
 by push are polled on an adapting schedule with conditional requests.
+
+Set RSS_EXPERT_ACTIVITYPUB and @handle@yourdomain becomes an address the
+fediverse can follow: WebFinger, an actor document, a signed inbox, and one
+Create per follower when you publish. Only being followed works so far; replies
+from Mastodon land in stage 2. Off means the routes do not exist, not that they
+answer politely.
+
+Settle the domain before turning it on. Actor, key and post identifiers are
+absolute URLs on it and every receiver enforces origin matching, so moving
+afterwards kills the actor: old followers point at an address that answers
+nothing, and an edit to an old post arrives as a stranger claiming somebody
+else's identifier. Post guids are never rewritten, including on a move.
 
 Threads use source:inReplyTo with thr:in-reply-to (RFC 4685) as a fallback.
 A post's guid is its bare permalink. Unknown XML elements are passed through
@@ -157,7 +170,7 @@ are typed by their magic bytes, decoded before they are stored, and stripped of
 EXIF and PNG text chunks without re-encoding a single pixel. Sessions and
 tokens are stored hashed; passwords use argon2id. A TOTP code cannot be used
 twice. The public federation endpoints -- the hub, the cloud registration,
-Webmention and Micropub -- are rate limited per address, so a stranger cannot
+Webmention, Micropub and the fediverse inbox -- are rate limited per address, so a stranger cannot
 use them to hammer a third party or to fill the disk. Pages carry
 Content-Security-Policy default-src 'none' plus script-src 'self'; the only
 script is the twenty-line island, served from this origin, and no page carries
@@ -180,6 +193,7 @@ interop knowledge that makes it possible came from other people's work:
                       https://github.com/rmdes/rsc
 
   IndieWeb            Micropub, Webmention, IndieAuth, microformats2.
+  W3C                 ActivityPub and ActivityStreams 2.0.
                       https://indieweb.org/
 
   JSON Feed           Manton Reece and Brent Simmons.

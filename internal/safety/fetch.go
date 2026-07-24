@@ -33,6 +33,7 @@ var (
 
 type Options struct {
 	MaxBytes           int64
+	NoRedirects        bool
 	MaxRedirects       int
 	Timeout            time.Duration
 	UserAgent          string
@@ -97,13 +98,20 @@ func New(o Options) *Fetcher {
 				ResponseHeaderTimeout: 20 * time.Second,
 				ExpectContinueTimeout: time.Second,
 			},
-			CheckRedirect: redirectGuard(o.MaxRedirects),
+			CheckRedirect: redirectPolicy(o),
 			Timeout:       o.Timeout,
 		},
 		maxBytes: o.MaxBytes,
 		accept:   accept,
 		agent:    o.UserAgent,
 	}
+}
+
+func redirectPolicy(o Options) func(*http.Request, []*http.Request) error {
+	if o.NoRedirects {
+		return func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	}
+	return redirectGuard(o.MaxRedirects)
 }
 
 func (f *Fetcher) Get(ctx context.Context, rawURL string, header http.Header) (*Result, error) {

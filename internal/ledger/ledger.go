@@ -24,9 +24,10 @@ func (o Outcome) Settled() bool {
 type Protocol string
 
 const (
-	WebSub     Protocol = "websub"
-	RSSCloud   Protocol = "rsscloud"
-	Webmention Protocol = "webmention"
+	WebSub      Protocol = "websub"
+	RSSCloud    Protocol = "rsscloud"
+	Webmention  Protocol = "webmention"
+	ActivityPub Protocol = "activitypub"
 )
 
 type Attempt struct {

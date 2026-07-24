@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/runawaydevil/rss-expert/internal/activitypub"
 	"github.com/runawaydevil/rss-expert/internal/jobs"
 	"github.com/runawaydevil/rss-expert/internal/ledger"
 	"github.com/runawaydevil/rss-expert/internal/publish"
@@ -42,6 +43,7 @@ func queueSpec(mentionID int64) jobs.Spec {
 
 func (a *App) afterPublish(r *http.Request, post *publish.Post) {
 	a.announce(context.WithoutCancel(r.Context()), post)
+	a.FanOut(context.WithoutCancel(r.Context()), post)
 
 	if post.InReplyTo == "" {
 		return
@@ -71,6 +73,9 @@ func (a *App) announce(ctx context.Context, post *publish.Post) {
 }
 
 type Deliverer struct {
+	ap       *activitypub.Store
+	apClient *activitypub.Client
+	base     string
 	queue    *jobs.Queue
 	mentions *webmention.Store
 	ledger   *ledger.Ledger
@@ -78,7 +83,15 @@ type Deliverer struct {
 }
 
 func NewDeliverer(app *App) *Deliverer {
-	return &Deliverer{queue: app.queue, mentions: app.mentions, ledger: app.ledger, log: app.log}
+	return &Deliverer{
+		ap:       app.ap,
+		apClient: app.apClient,
+		base:     app.posts.BaseURL(),
+		queue:    app.queue,
+		mentions: app.mentions,
+		ledger:   app.ledger,
+		log:      app.log,
+	}
 }
 
 func (d *Deliverer) Run(ctx context.Context) {
@@ -97,13 +110,14 @@ func (d *Deliverer) Run(ctx context.Context) {
 		case <-ctx.Done():
 			d.log.Info("delivery worker stopped")
 			return
+		case <-d.queue.Waiting():
 		case <-time.After(deliveryIdle):
 		}
 	}
 }
 
 func (d *Deliverer) once(ctx context.Context) (bool, error) {
-	job, err := d.queue.Claim(ctx, kindVerifyMention, kindSendMention)
+	job, err := d.queue.Claim(ctx, kindVerifyMention, kindSendMention, kindDeliverActivity)
 	if errors.Is(err, jobs.ErrNoJob) {
 		return false, nil
 	}
@@ -116,6 +130,8 @@ func (d *Deliverer) once(ctx context.Context) (bool, error) {
 		err = d.verify(ctx, job)
 	case kindSendMention:
 		err = d.send(ctx, job)
+	case kindDeliverActivity:
+		err = d.deliverActivity(ctx, job)
 	}
 
 	if err != nil {

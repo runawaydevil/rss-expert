@@ -77,6 +77,12 @@ func (a *App) postPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Vary", "Accept")
+	if a.federates && wantsActivityJSON(r) {
+		writeActivityJSON(w, http.StatusOK, a.note(post, post.Handle))
+		return
+	}
+
 	replies, err := a.posts.Replies(r.Context(), post.GUID, 200)
 	if err != nil {
 		a.log.Error("could not read replies", "error", err)

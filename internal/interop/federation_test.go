@@ -73,7 +73,7 @@ func newInstance(t *testing.T, domain string) *instance {
 
 	server := httptest.NewUnstartedServer(nil)
 	base := "http://" + server.Listener.Addr().String()
-	app := web.New(db, quiet, base, web.Options{ShowPreview: true, ReachPrivate: true})
+	app := web.New(db, quiet, base, web.Options{ShowPreview: true, ReachPrivate: true, ActivityPub: true})
 	server.Config.Handler = app.Handler()
 	server.Start()
 	t.Cleanup(server.Close)

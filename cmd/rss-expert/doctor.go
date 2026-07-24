@@ -60,6 +60,7 @@ func checkAll(ctx context.Context, cfg config.Config) []check {
 		{name: "serving", detail: "domain " + cfg.Domain, err: cfg.RequireServing()},
 		{name: "env files", detail: describeEnvFiles()},
 		{name: "limits", detail: describeLimits(cfg)},
+		{name: "federation", detail: describeFederation(cfg)},
 	}
 
 	if running, detail := instanceIsRunning(ctx, cfg); running {
@@ -210,6 +211,13 @@ func describeLimits(cfg config.Config) string {
 	}
 	return fmt.Sprintf("quota %d MiB, fetch %d MiB, cache %d MiB, %d poll workers, %s%s",
 		cfg.MediaQuota>>20, cfg.FetchLimit>>20, cfg.CacheMiB, cfg.PollWorkers, proxy, preview)
+}
+
+func describeFederation(cfg config.Config) string {
+	if !cfg.ActivityPub {
+		return "rss, websub, rsscloud, webmention; activitypub off"
+	}
+	return "rss, websub, rsscloud, webmention, activitypub as @handle@" + cfg.Domain
 }
 
 func describePragmas(pragmas map[string]string) string {

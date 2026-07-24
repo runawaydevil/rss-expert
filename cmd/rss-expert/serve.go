@@ -10,6 +10,7 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/runawaydevil/rss-expert/internal/activitypub"
 	"github.com/runawaydevil/rss-expert/internal/config"
 	"github.com/runawaydevil/rss-expert/internal/identity"
 	"github.com/runawaydevil/rss-expert/internal/ingest"
@@ -74,6 +75,7 @@ func serve(ctx context.Context, args []string) error {
 		FetchLimit:   cfg.FetchLimit,
 		DataDir:      cfg.DataDir,
 		Registration: cfg.Registration,
+		ActivityPub:  cfg.ActivityPub,
 		Mailer:       mailer,
 	})
 
@@ -100,6 +102,7 @@ func serve(ctx context.Context, args []string) error {
 	defer stopUpkeep()
 	go upkeep{
 		instance: instance,
+		ap:       activitypub.New(db),
 		push:     push.New(db),
 		accounts: accounts,
 		sources:  ingest.NewStore(db),

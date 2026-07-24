@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/runawaydevil/rss-expert/internal/activitypub"
 	"github.com/runawaydevil/rss-expert/internal/identity"
 	"github.com/runawaydevil/rss-expert/internal/indieweb"
 	"github.com/runawaydevil/rss-expert/internal/ingest"
@@ -44,6 +45,9 @@ type App struct {
 	mail         *mail.Sender
 	live         *liveGate
 	federation   *limiter
+	inboxLimit   *limiter
+	ap           *activitypub.Store
+	apClient     *activitypub.Client
 	poller       *poller.Poller
 	log          *slog.Logger
 	domain       string
@@ -51,6 +55,7 @@ type App struct {
 	showPreview  bool
 	dataDir      string
 	registration string
+	federates    bool
 }
 
 type Options struct {
@@ -64,6 +69,7 @@ type Options struct {
 	ReachPrivate bool
 	DataDir      string
 	Registration string
+	ActivityPub  bool
 	Mailer       *mail.Sender
 }
 
@@ -108,6 +114,12 @@ func New(db *store.DB, log *slog.Logger, domain string, o Options) *App {
 		mail:       o.Mailer,
 		live:       newLiveGate(liveMaxClients),
 		federation: newLimiter(30, 120),
+		inboxLimit: newLimiter(240, 3600),
+		ap:         activitypub.New(db),
+		apClient: activitypub.NewClient(activitypub.ClientOptions{
+			UserAgent:    "rss-expert (+https://" + domain + ")",
+			ReachPrivate: o.ReachPrivate,
+		}),
 		poller: poller.New(sources, log, poller.Options{
 			UserAgent:         "rss-expert (+" + domain + ")",
 			AllowPrivateAddrs: o.ReachPrivate,
@@ -119,6 +131,7 @@ func New(db *store.DB, log *slog.Logger, domain string, o Options) *App {
 		showPreview:  o.ShowPreview,
 		dataDir:      o.DataDir,
 		registration: registrationMode(o.Registration),
+		federates:    o.ActivityPub,
 	}
 }
 
@@ -142,6 +155,12 @@ func (a *App) Handler() http.Handler {
 		mux.HandleFunc("GET /dev/preview", a.preview)
 	}
 
+	if a.federates {
+		mux.HandleFunc("GET /.well-known/webfinger", a.throttle(a.webfinger))
+		mux.HandleFunc("POST /users/{handle}/inbox", a.inbox)
+		mux.HandleFunc("GET /users/{handle}/followers", a.throttle(a.followersCollection))
+		mux.HandleFunc("GET /users/{handle}/outbox", a.throttle(a.outboxCollection))
+	}
 	mux.HandleFunc("GET /users/rss.xml", a.firehoseFeed)
 	mux.HandleFunc("GET /users/{handle}/rss.xml", a.accountFeed)
 	mux.HandleFunc("GET /users/{handle}", a.profile)

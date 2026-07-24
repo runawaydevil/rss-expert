@@ -22,6 +22,7 @@ type Config struct {
 	AdminEmail    string
 	AdminPassword string
 	BehindProxy   bool
+	ActivityPub   bool
 	ShowPreview   bool
 	MediaQuota    int64
 	FetchLimit    int64
@@ -46,6 +47,7 @@ func Load() (Config, error) {
 		AdminEmail:    env("ADMIN_EMAIL", ""),
 		AdminPassword: env("ADMIN_PASSWORD", ""),
 		BehindProxy:   truthy(env("BEHIND_PROXY", "")),
+		ActivityPub:   truthy(env("ACTIVITYPUB", "")),
 		ShowPreview:   truthy(env("SHOW_PREVIEW", "")),
 	}
 

@@ -410,6 +410,23 @@ func (s *Store) withMedia(ctx context.Context, posts []*Post) []*Post {
 	return posts
 }
 
+func (s *Store) AccountByHandle(ctx context.Context, handle string) (int64, string, error) {
+	var (
+		id       int64
+		resolved string
+	)
+	err := s.db.Read.QueryRowContext(ctx,
+		`select id, handle from account where handle = ? collate nocase`, handle).
+		Scan(&id, &resolved)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, "", nil
+	}
+	if err != nil {
+		return 0, "", err
+	}
+	return id, resolved, nil
+}
+
 func (s *Store) HandleFor(ctx context.Context, accountID int64) (string, error) {
 	var handle sql.NullString
 	err := s.db.Read.QueryRowContext(ctx,

@@ -46,10 +46,20 @@ func (j *Job) LastChance() bool { return j.Attempts >= j.MaxAttempts }
 type Queue struct {
 	db    *store.DB
 	lease time.Duration
+	woken chan struct{}
 }
 
 func New(db *store.DB) *Queue {
-	return &Queue{db: db, lease: DefaultLease}
+	return &Queue{db: db, lease: DefaultLease, woken: make(chan struct{}, 1)}
+}
+
+func (q *Queue) Waiting() <-chan struct{} { return q.woken }
+
+func (q *Queue) wake() {
+	select {
+	case q.woken <- struct{}{}:
+	default:
+	}
 }
 
 type Spec struct {
@@ -90,6 +100,7 @@ func (q *Queue) Enqueue(ctx context.Context, spec Spec) (int64, error) {
 		}
 		return 0, fmt.Errorf("jobs: enqueue: %w", err)
 	}
+	q.wake()
 	return res.LastInsertId()
 }
 

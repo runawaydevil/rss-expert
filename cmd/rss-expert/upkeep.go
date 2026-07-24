@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/runawaydevil/rss-expert/internal/activitypub"
 	"github.com/runawaydevil/rss-expert/internal/identity"
 	"github.com/runawaydevil/rss-expert/internal/ingest"
 	"github.com/runawaydevil/rss-expert/internal/jobs"
@@ -15,10 +16,12 @@ import (
 const (
 	upkeepInterval  = 1 * time.Hour
 	finishedJobsAge = 14 * 24 * time.Hour
+	seenActivityAge = 30 * 24 * time.Hour
 )
 
 type upkeep struct {
 	instance *web.App
+	ap       *activitypub.Store
 	push     *push.Store
 	accounts *identity.Store
 	sources  *ingest.Store
@@ -70,6 +73,12 @@ func (u upkeep) once(ctx context.Context) {
 		u.log.Warn("could not forget expired subscribers", "error", err)
 	} else if n > 0 {
 		u.log.Info("forgot subscribers whose lease ran out", "count", n)
+	}
+
+	if n, err := u.ap.ForgetOldActivities(ctx, seenActivityAge); err != nil {
+		u.log.Warn("could not forget old activity ids", "error", err)
+	} else if n > 0 {
+		u.log.Info("forgot old activity ids", "count", n)
 	}
 
 	if n := u.instance.RenewPush(ctx); n > 0 {

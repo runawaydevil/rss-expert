@@ -13,6 +13,12 @@ func (a *App) profile(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	handle := r.PathValue("handle")
 
+	w.Header().Set("Vary", "Accept")
+	if a.federates && wantsActivityJSON(r) {
+		a.actorJSON(w, r)
+		return
+	}
+
 	posts, err := a.posts.ByHandle(ctx, handle, 40)
 	if err != nil {
 		a.log.Error("could not read an account's posts", "error", err)
