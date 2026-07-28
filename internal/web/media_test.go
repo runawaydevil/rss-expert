@@ -196,4 +196,10 @@ func TestAttachedFileTravelsInTheFeed(t *testing.T) {
 	if !strings.Contains(string(post), `alt="A test pattern"`) {
 		t.Error("the post does not carry the description to a screen reader")
 	}
+
+	timeline, _ := io.ReadAll(getAs(t, h, "/", session).Body)
+	if !strings.Contains(string(timeline), "Open the image") ||
+		!regexp.MustCompile(`/media/[0-9a-f]{64}`).Match(timeline) {
+		t.Fatal("the attachment was not projected back into the shared timeline")
+	}
 }

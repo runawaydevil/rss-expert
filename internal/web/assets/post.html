@@ -41,6 +41,11 @@
 					aria-label="Reply. Your reply is published in your own feed; their site reads it back from there."
 					data-tip="Your reply is published in your own feed. Their site reads it back from there.">{{icon "comment"}} Reply</a>
 				{{end}}
+				{{if .Mine}}
+				<a href="{{.Post.URL}}/edit"
+					aria-label="Edit or withdraw this post."
+					data-tip="The address does not change, so replies already written keep pointing at it. Everyone following you is told.">Edit</a>
+				{{end}}
 				<a href="{{.Post.URL}}/journey"
 					aria-label="Where it went. Every feed it is in and every notification that was pushed."
 					data-tip="Every feed it sits in, and every notification pushed to whoever it answered — including the attempts that failed.">{{icon "check"}} Where it went</a>

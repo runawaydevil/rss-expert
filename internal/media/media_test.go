@@ -347,6 +347,33 @@ func TestFilesComeBackAttachedToTheirPost(t *testing.T) {
 	}
 }
 
+func TestAFileCannotBeAttachedToAnotherAccountsPost(t *testing.T) {
+	s, alice := testStore(t, DefaultQuota)
+	ctx := context.Background()
+
+	bob, err := identity.NewStore(s.db).Create(ctx,
+		"bob@example.org", "a long enough password", identity.RoleUser)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bobsFile, err := s.Put(ctx, bob.ID, "private.png", plainPNG(t), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	alicesPost := seedPost(t, s, alice.ID)
+
+	if err := s.Attach(ctx, alicesPost, bobsFile.ID, 0); !errors.Is(err, ErrNotYours) {
+		t.Fatalf("cross-account attachment returned %v, want ErrNotYours", err)
+	}
+	files, err := s.ForPost(ctx, alicesPost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 0 {
+		t.Fatal("another account's file was attached despite the ownership check")
+	}
+}
+
 func plainPNG(t *testing.T) []byte {
 	t.Helper()
 	img := image.NewRGBA(image.Rect(0, 0, 6, 6))

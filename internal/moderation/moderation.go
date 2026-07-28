@@ -144,7 +144,7 @@ func (f *Filter) Hides(itemKey, link, feedURL, text string) (bool, string) {
 		return true, "this source is blocked"
 	}
 
-	for _, candidate := range []string{link, itemKey} {
+	for _, candidate := range []string{link, itemKey, feedURL} {
 		if host := hostOf(candidate); host != "" && f.domains[host] {
 			return true, host + " is blocked"
 		}

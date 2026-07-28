@@ -63,7 +63,7 @@ usage: rss-expert <command> [flags]
 
   serve        run the instance
   migrate      apply pending schema migrations
-  sources      list, add and read the feeds this instance follows
+  sources      list, add, read and remove the feeds this instance follows
   backup       write a verified snapshot to a directory
   restore      restore a snapshot, or --check one without touching anything
   doctor       check this installation and report what is wrong
@@ -75,7 +75,6 @@ which wins over both:
 
   RSS_EXPERT_DOMAIN         public hostname; required to serve
   RSS_EXPERT_LISTEN         application address        (default :11080)
-  RSS_EXPERT_ADMIN_LISTEN   admin address              (default 127.0.0.1:11090)
   RSS_EXPERT_DATA_DIR       database and attachments   (default data)
   RSS_EXPERT_ENV_FILE       read this file instead of the two above
   RSS_EXPERT_SMTP_URL       mail server for links and confirmation

@@ -117,6 +117,20 @@ func (a *auth) submitLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	twoFactor, err := a.accounts.TOTPEnabled(r.Context(), account.ID)
+	if err != nil {
+		a.log.Error("could not read two-factor state during sign-in", "account", account.Email, "error", err)
+		a.renderLogin(w, r, email, "Something went wrong. Try again.")
+		return
+	}
+	if twoFactor {
+		if err := a.accounts.CheckSecondFactor(r.Context(), account, r.PostFormValue("code")); err != nil {
+			a.log.Info("failed second factor", "email", email, "ip", clientIP(r, a.behindProxy))
+			a.renderLogin(w, r, email, "That two-factor or recovery code is not right.")
+			return
+		}
+	}
+
 	token, expires, err := a.accounts.CreateSession(r.Context(), account)
 	if err != nil {
 		a.log.Error("could not create session", "error", err)

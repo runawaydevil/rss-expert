@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strconv"
 	"text/tabwriter"
 	"time"
 
@@ -30,6 +31,8 @@ func sources(ctx context.Context, args []string) error {
 		return addSource(ctx, rest)
 	case "read":
 		return readSources(ctx, rest)
+	case "remove":
+		return removeSources(ctx, rest)
 	default:
 		return fmt.Errorf("unknown sources command %q", command)
 	}
@@ -145,6 +148,30 @@ func readSources(ctx context.Context, args []string) error {
 			if err := readOne(ctx, s, cfg, source); err != nil {
 				fmt.Fprintf(os.Stderr, "%s: %v\n", source.FeedURL, err)
 			}
+		}
+		return nil
+	})
+}
+
+func removeSources(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("sources remove", flag.ExitOnError)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() == 0 {
+		return errors.New("usage: rss-expert sources remove <source id> [source id...]")
+	}
+
+	return withSources(ctx, func(ctx context.Context, s *ingest.Store, _ config.Config) error {
+		for _, raw := range fs.Args() {
+			id, err := strconv.ParseInt(raw, 10, 64)
+			if err != nil || id <= 0 {
+				return fmt.Errorf("%q is not a source id", raw)
+			}
+			if err := s.RemoveSource(ctx, id); err != nil {
+				return fmt.Errorf("source %d: %w", id, err)
+			}
+			fmt.Printf("removed source %d\n", id)
 		}
 		return nil
 	})

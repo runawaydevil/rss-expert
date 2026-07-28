@@ -87,6 +87,11 @@ func (a *App) timeline(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		a.log.Error("could not read the timeline", "error", err)
 	}
+	accountID := int64(0)
+	if account != nil {
+		accountID = account.ID
+	}
+	items = a.visibleItems(ctx, accountID, items)
 
 	latest, err := a.sources.Newest(ctx)
 	if err != nil {
@@ -127,6 +132,32 @@ func (a *App) timeline(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	a.render(w, r, "reader.html", data)
+}
+
+func (a *App) visibleItems(ctx context.Context, accountID int64, items []ingest.Item) []ingest.Item {
+	filter, err := a.moderation.FilterFor(ctx, accountID)
+	if err != nil {
+		a.log.Error("could not apply moderation to the timeline", "account", accountID, "error", err)
+		return items
+	}
+
+	visible := items[:0]
+	for i := range items {
+		item := &items[i]
+		text := strings.Join([]string{
+			item.Title,
+			item.Markdown,
+			item.HTML,
+			item.Author,
+			item.OriginName,
+			item.SourceTitle,
+		}, "\n")
+		if hidden, _ := filter.Hides(item.Key, item.Link, item.SourceFeedURL, text); hidden {
+			continue
+		}
+		visible = append(visible, *item)
+	}
+	return visible
 }
 
 func (a *App) decorate(ctx context.Context, account *identity.Account, items []ingest.Item) []postView {

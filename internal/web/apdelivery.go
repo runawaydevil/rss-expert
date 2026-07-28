@@ -2,11 +2,11 @@ package web
 
 import (
 	"context"
+	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"net/http"
 	"time"
 
 	"github.com/runawaydevil/rss-expert/internal/activitypub"
@@ -21,23 +21,24 @@ const (
 )
 
 type deliverPayload struct {
-	AccountID int64           `json:"account_id"`
-	Handle    string          `json:"handle"`
-	Inbox     string          `json:"inbox"`
-	ItemKey   string          `json:"item_key"`
-	Document  json.RawMessage `json:"document"`
+	AccountID  int64           `json:"account_id"`
+	Handle     string          `json:"handle"`
+	Inbox      string          `json:"inbox"`
+	ItemKey    string          `json:"item_key"`
+	ActivityID string          `json:"-"`
+	Document   json.RawMessage `json:"document"`
 }
 
-func (a *App) instanceIdentity(r *http.Request) activitypub.Identity {
-	owner, err := a.accounts.Owner(r.Context())
+func (a *App) instanceIdentity(ctx context.Context) activitypub.Identity {
+	owner, err := a.accounts.Owner(ctx)
 	if err != nil || owner == nil {
 		return activitypub.Identity{}
 	}
-	handle, err := a.posts.HandleFor(r.Context(), owner.ID)
+	handle, err := a.posts.HandleFor(ctx, owner.ID)
 	if err != nil || handle == "" {
 		return activitypub.Identity{}
 	}
-	key, _, err := a.ap.EnsureKey(r.Context(), owner.ID)
+	key, _, err := a.ap.EnsureKey(ctx, owner.ID)
 	if err != nil {
 		return activitypub.Identity{}
 	}
@@ -54,23 +55,28 @@ func fingerprint(parts ...string) string {
 }
 
 func (a *App) enqueueDelivery(ctx context.Context, payload deliverPayload) {
+	tag := payload.ActivityID
+	if tag == "" {
+		tag = fingerprint(string(payload.Document))
+	}
 	_, err := a.queue.Enqueue(ctx, jobs.Spec{
 		Kind:    kindDeliverActivity,
 		Payload: payload,
-		IdemKey: kindDeliverActivity + ":" + fingerprint(payload.Inbox, payload.ItemKey, string(payload.Document)),
+		IdemKey: kindDeliverActivity + ":" + fingerprint(payload.Inbox, tag),
 	})
 	if err != nil && !errors.Is(err, jobs.ErrDuplicate) {
 		a.log.Error("could not queue an activity delivery", "error", err)
 	}
 }
 
-func (a *App) queueAccept(r *http.Request, accountID int64, handle string,
+func (a *App) queueAccept(ctx context.Context, accountID int64, handle string,
 	follow *activitypub.Activity, actor *activitypub.Actor) {
 
 	uri := a.actorURI(handle)
+	acceptID := uri + "/accepts/" + fingerprint(follow.ID, actor.ID)
 	document, err := json.Marshal(map[string]any{
 		"@context": "https://www.w3.org/ns/activitystreams",
-		"id":       uri + "/accepts/" + fingerprint(follow.ID, actor.ID),
+		"id":       acceptID,
 		"type":     "Accept",
 		"actor":    uri,
 		"object":   json.RawMessage(rawFollow(follow)),
@@ -80,12 +86,13 @@ func (a *App) queueAccept(r *http.Request, accountID int64, handle string,
 		return
 	}
 
-	a.enqueueDelivery(context.WithoutCancel(r.Context()), deliverPayload{
-		AccountID: accountID,
-		Handle:    handle,
-		Inbox:     actor.Inbox,
-		ItemKey:   follow.ID,
-		Document:  document,
+	a.enqueueDelivery(ctx, deliverPayload{
+		AccountID:  accountID,
+		Handle:     handle,
+		Inbox:      actor.Inbox,
+		ItemKey:    follow.ID,
+		ActivityID: acceptID,
+		Document:   document,
 	})
 }
 
@@ -123,53 +130,20 @@ func (a *App) note(post *publish.Post, handle string) *activitypub.Note {
 	return note
 }
 
-func (a *App) FanOut(ctx context.Context, post *publish.Post) {
-	if !a.federates || post.Handle == "" {
-		return
-	}
-
-	inboxes, err := a.ap.Followers(ctx, post.AccountID)
-	if err != nil {
-		a.log.Error("could not read followers", "error", err)
-		return
-	}
-	if len(inboxes) == 0 {
-		return
-	}
-	if len(inboxes) > fanOutCeiling {
-		a.log.Warn("fan-out truncated",
-			"followers", len(inboxes), "ceiling", fanOutCeiling, "post", post.GUID)
-		inboxes = inboxes[:fanOutCeiling]
-	}
-
-	uri := a.actorURI(post.Handle)
-	document, err := json.Marshal(map[string]any{
-		"@context": activitypub.Context(),
-		"id":       post.GUID + "#create",
-		"type":     "Create",
-		"actor":    uri,
-		"to":       []string{activitypub.Public},
-		"cc":       []string{uri + "/followers"},
-		"object":   a.note(post, post.Handle),
-	})
-	if err != nil {
-		a.log.Error("could not build a Create", "error", err)
-		return
-	}
-
-	for _, inbox := range inboxes {
-		a.enqueueDelivery(ctx, deliverPayload{
-			AccountID: post.AccountID,
-			Handle:    post.Handle,
-			Inbox:     inbox,
-			ItemKey:   post.GUID,
-			Document:  document,
-		})
-	}
-}
-
 func (d *Deliverer) keyID(handle string) string {
 	return d.base + "/users/" + handle + "#main-key"
+}
+
+func (d *Deliverer) signingKey(ctx context.Context, accountID int64) (*rsa.PrivateKey, error) {
+	if cached, ok := d.keys.Load(accountID); ok {
+		return cached.(*rsa.PrivateKey), nil
+	}
+	key, _, err := d.ap.EnsureKey(ctx, accountID)
+	if err != nil {
+		return nil, err
+	}
+	d.keys.Store(accountID, key)
+	return key, nil
 }
 
 func (d *Deliverer) deliverActivity(ctx context.Context, job *jobs.Job) error {
@@ -178,16 +152,23 @@ func (d *Deliverer) deliverActivity(ctx context.Context, job *jobs.Job) error {
 		return err
 	}
 
-	key, _, err := d.ap.EnsureKey(ctx, payload.AccountID)
+	key, err := d.signingKey(ctx, payload.AccountID)
 	if err != nil {
 		return err
 	}
 
 	started := time.Now()
-	err = d.apClient.Deliver(ctx, payload.Inbox, payload.Document, activitypub.Identity{
-		KeyID: d.keyID(payload.Handle),
-		Key:   key,
+	preferred := d.ap.SigningFor(ctx, payload.Inbox)
+	worked, err := d.apClient.Deliver(ctx, payload.Inbox, payload.Document, activitypub.Identity{
+		KeyID:   d.keyID(payload.Handle),
+		Key:     key,
+		Signing: preferred,
 	})
+	if err == nil && worked != preferred {
+		d.ap.RememberSigning(ctx, payload.Inbox, worked)
+		d.log.Info("the far side wants a different signature",
+			"inbox", payload.Inbox, "signing", worked)
+	}
 
 	attempt := ledger.Attempt{
 		ItemKey:   payload.ItemKey,

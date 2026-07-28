@@ -21,8 +21,9 @@
 		there — nothing is posted onto anyone else's server.</p>
 		{{end}}
 
-		<form class="panel form" method="post" action="/write">
-			<h1>{{if .Parent}}Reply{{else}}Write{{end}}</h1>
+		<form class="panel form" method="post"
+			action="{{if .Editing}}/p/{{.Editing.ID}}/edit{{else}}/write{{end}}">
+			<h1>{{if .Editing}}Edit{{else if .Parent}}Reply{{else}}Write{{end}}</h1>
 
 			{{if .Problem}}
 			<p class="form-problem" role="alert">{{.Problem}}</p>
@@ -59,14 +60,31 @@
 			{{end}}
 
 			<p class="write-actions">
-				<button type="submit" class="button-primary">Publish</button>
+				<button type="submit" class="button-primary">{{if .Editing}}Save{{else}}Publish{{end}}</button>
+				{{if not .Editing}}
 				<button type="submit" name="preview" value="1" class="button-quiet"
 					data-tip="Renders it here without publishing. Your text is kept, so you can leave and come back.">Preview</button>
+				{{end}}
 			</p>
 
+			{{if .Editing}}
+			<p class="form-aside">The edit goes out to everyone following you. The address stays
+			the same, so replies already written keep pointing at it.</p>
+			{{else}}
 			<p class="form-aside">Published here immediately, and carried out in your feed at
 			<code>/users/…/rss.xml</code> for anyone following you.</p>
+			{{end}}
 		</form>
+
+		{{if .Editing}}
+		<form class="panel form" method="post" action="/p/{{.Editing.ID}}/withdraw">
+			<h2>Withdraw</h2>
+			<input type="hidden" name="csrf" value="{{.CSRF}}">
+			<p class="form-aside">It leaves your feed and everyone following you is told to drop it.
+			Anyone who already read it may still have a copy. This cannot be undone.</p>
+			<button type="submit" class="button-quiet">Withdraw this post</button>
+		</form>
+		{{end}}
 	</main>
 </div>
 

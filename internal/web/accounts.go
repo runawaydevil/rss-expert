@@ -38,16 +38,23 @@ func (a *App) submitRegister(w http.ResponseWriter, r *http.Request) {
 	password := r.PostFormValue("password")
 	invite := strings.TrimSpace(r.PostFormValue("invite"))
 
-	if a.registration != "open" {
-		token, err := a.accounts.RedeemToken(ctx, invite, identity.PurposeInvite)
-		if err != nil || !strings.EqualFold(token.Email, email) {
-			a.renderRegister(w, r, email, "That invitation is not valid for this address.", true)
-			return
-		}
+	var (
+		account *identity.Account
+		err     error
+	)
+	if a.registration == "open" {
+		account, err = a.accounts.Create(ctx, email, password, identity.RoleUser)
+	} else {
+		account, err = a.accounts.CreateWithInvite(ctx, email, password, identity.RoleUser, invite)
 	}
 
-	account, err := a.accounts.Create(ctx, email, password, identity.RoleUser)
 	switch {
+	case a.registration != "open" &&
+		(errors.Is(err, identity.ErrBadToken) ||
+			errors.Is(err, identity.ErrTokenExpired) ||
+			errors.Is(err, identity.ErrTokenUsed)):
+		a.renderRegister(w, r, email, "That invitation is not valid for this address.", true)
+		return
 	case errors.Is(err, identity.ErrEmailTaken):
 		a.log.Info("someone tried to register a taken address", "email", email)
 		a.renderRegister(w, r, email, "If that address is free, your account is created. Check your mail.", false)
@@ -201,8 +208,10 @@ func (a *App) submitRecover(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token := r.PostFormValue("token")
-	redeemed, err := a.accounts.RedeemToken(ctx, token, identity.PurposeRecover)
-	if err != nil {
+	accountID, err := a.accounts.RecoverPassword(ctx, token, r.PostFormValue("password"))
+	if errors.Is(err, identity.ErrBadToken) ||
+		errors.Is(err, identity.ErrTokenExpired) ||
+		errors.Is(err, identity.ErrTokenUsed) {
 		a.render(w, r, "outcome.html", map[string]any{
 			"Title":   "That link did not work — RSS Expert",
 			"Heading": "That link did not work",
@@ -210,8 +219,7 @@ func (a *App) submitRecover(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-
-	if err := a.accounts.SetPassword(ctx, redeemed.AccountID, r.PostFormValue("password")); err != nil {
+	if err != nil {
 		a.render(w, r, "recover.html", map[string]any{
 			"Title":   "Set a new password — RSS Expert",
 			"Token":   token,
@@ -220,8 +228,8 @@ func (a *App) submitRecover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	a.log.Info("password set through recovery", "account", redeemed.AccountID)
-	a.startSession(w, r, redeemed.AccountID, "your new password is set and you are signed in")
+	a.log.Info("password set through recovery", "account", accountID)
+	a.startSession(w, r, accountID, "your new password is set and you are signed in")
 }
 
 func (a *App) startSession(w http.ResponseWriter, r *http.Request, accountID int64, note string) {

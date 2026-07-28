@@ -162,3 +162,17 @@ func (a *Actor) DeliveryInbox() string {
 	}
 	return a.Inbox
 }
+
+func (a *Activity) Undone() (*Activity, error) {
+	if len(a.Object) == 0 {
+		return nil, errors.New("activitypub: the undo carries no object")
+	}
+	var undone Activity
+	if err := json.Unmarshal(a.Object, &undone); err != nil {
+		return nil, err
+	}
+	if undone.Type == "" {
+		return nil, errors.New("activitypub: the undo does not say what it undoes")
+	}
+	return &undone, nil
+}

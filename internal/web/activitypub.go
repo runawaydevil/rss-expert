@@ -1,13 +1,17 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/runawaydevil/rss-expert/internal/activitypub"
+	"github.com/runawaydevil/rss-expert/internal/feed"
+	"github.com/runawaydevil/rss-expert/internal/publish"
 )
 
 const inboxMaxBytes = 1 << 20
@@ -68,13 +72,13 @@ func (a *App) webfinger(w http.ResponseWriter, r *http.Request) {
 		a.actorURI(handle), a.actorURI(handle)))
 }
 
-func (a *App) actorDocument(r *http.Request, handle string) (*activitypub.Actor, error) {
-	accountID, canonical, err := a.posts.AccountByHandle(r.Context(), handle)
+func (a *App) actorFor(ctx context.Context, handle string) (*activitypub.Actor, error) {
+	accountID, canonical, err := a.posts.AccountByHandle(ctx, handle)
 	if err != nil || accountID == 0 {
 		return nil, errNoSuchAccount
 	}
 
-	public, err := a.ap.PublicKeyFor(r.Context(), accountID)
+	public, err := a.ap.PublicKeyFor(ctx, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -90,6 +94,8 @@ func (a *App) actorDocument(r *http.Request, handle string) (*activitypub.Actor,
 		Inbox:             uri + "/inbox",
 		Outbox:            uri + "/outbox",
 		Followers:         uri + "/followers",
+		Following:         uri + "/following",
+		Endpoints:         &activitypub.Endpoints{SharedInbox: a.posts.BaseURL() + "/inbox"},
 		Discoverable:      true,
 		PublicKey: &activitypub.PublicKey{
 			ID:           a.keyID(canonical),
@@ -98,7 +104,7 @@ func (a *App) actorDocument(r *http.Request, handle string) (*activitypub.Actor,
 		},
 	}
 
-	if sites, err := a.sites.ForAccount(r.Context(), accountID); err == nil {
+	if sites, err := a.sites.ForAccount(ctx, accountID); err == nil {
 		for _, site := range sites {
 			if !site.Verified() {
 				continue
@@ -119,7 +125,7 @@ func (a *App) actorDocument(r *http.Request, handle string) (*activitypub.Actor,
 var errNoSuchAccount = errors.New("web: no such account")
 
 func (a *App) actorJSON(w http.ResponseWriter, r *http.Request) {
-	actor, err := a.actorDocument(r, r.PathValue("handle"))
+	actor, err := a.actorFor(r.Context(), r.PathValue("handle"))
 	if err != nil {
 		http.Error(w, "no such account", http.StatusNotFound)
 		return
@@ -167,17 +173,25 @@ func (a *App) outboxCollection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	posts, err := a.posts.ByHandle(r.Context(), canonical, 1)
+	posts, err := a.posts.ByHandle(r.Context(), canonical, publish.FeedItemLimit)
 	if err != nil {
 		a.log.Error("could not read an account's posts", "error", err)
+	}
+	total, err := a.posts.CountByHandle(r.Context(), canonical)
+	if err != nil {
+		a.log.Error("could not count an account's outbox", "error", err)
+	}
+	items := make([]any, 0, len(posts))
+	for _, post := range posts {
+		items = append(items, a.createActivity(post))
 	}
 
 	writeActivityJSON(w, http.StatusOK, orderedCollection{
 		Context:    "https://www.w3.org/ns/activitystreams",
 		ID:         a.actorURI(canonical) + "/outbox",
 		Type:       "OrderedCollection",
-		TotalItems: len(posts),
-		Items:      []any{},
+		TotalItems: total,
+		Items:      items,
 	})
 }
 
@@ -214,11 +228,25 @@ func (a *App) inbox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	a.dispatch(w, r, accountID, canonical, activity, actor)
+}
+
+func (a *App) dispatch(w http.ResponseWriter, r *http.Request, accountID int64, handle string,
+	activity *activitypub.Activity, actor *activitypub.Actor) {
+
 	switch activity.Type {
 	case "Follow":
-		a.acceptFollow(w, r, accountID, canonical, activity, actor)
+		if accountID == 0 {
+			http.Error(w, "that follow names nobody here", http.StatusBadRequest)
+			return
+		}
+		a.acceptFollow(w, r, accountID, handle, activity, actor)
+	case "Create":
+		a.acceptCreate(w, r, activity, actor)
 	case "Undo":
-		a.undoFollow(w, r, accountID, activity, actor)
+		a.undo(w, r, accountID, activity, actor)
+	case "Like", "Announce":
+		a.acceptReaction(w, r, activity, actor)
 	case "Delete":
 		w.WriteHeader(http.StatusAccepted)
 	default:
@@ -226,6 +254,80 @@ func (a *App) inbox(w http.ResponseWriter, r *http.Request) {
 			"type", activity.Type, "actor", actor.ID)
 		w.WriteHeader(http.StatusAccepted)
 	}
+}
+
+func (a *App) acceptCreate(w http.ResponseWriter, r *http.Request,
+	activity *activitypub.Activity, actor *activitypub.Actor) {
+
+	note, err := activity.Note()
+	if err != nil || note.Type != "Note" || note.InReplyTo == "" {
+		a.log.Info("ignored an ActivityPub Create that is not a reply", "actor", actor.ID)
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+	if note.AttributedTo != actor.ID || !activitypub.SameOrigin(note.ID, actor.ID) {
+		http.Error(w, "that reply does not belong to its actor", http.StatusBadRequest)
+		return
+	}
+	if _, err := a.posts.ByGUID(r.Context(), note.InReplyTo); err != nil {
+		http.Error(w, "that reply names no post here", http.StatusBadRequest)
+		return
+	}
+
+	name := actor.Name
+	if name == "" {
+		name = actor.PreferredUsername
+	}
+	source, err := a.sources.EnsureFederatedSource(r.Context(), actor.ID, name)
+	if err != nil {
+		a.log.Error("could not prepare a source for an ActivityPub reply", "actor", actor.ID, "error", err)
+		http.Error(w, "could not store that reply", http.StatusInternalServerError)
+		return
+	}
+
+	item := feed.Item{
+		GUID:            note.ID,
+		GUIDIsPermalink: true,
+		Link:            note.URL,
+		HTML:            note.Content,
+		Title:           note.Name,
+		Author:          name,
+		InReplyTo:       note.InReplyTo,
+		Published:       activityTime(note.Published),
+		Updated:         activityTime(note.Updated),
+		Source:          &feed.Source{URL: actor.ID, Name: name},
+	}
+	if item.Link == "" {
+		item.Link = note.ID
+	}
+	if note.Source != nil && strings.EqualFold(note.Source.MediaType, "text/markdown") {
+		item.Markdown = note.Source.Content
+	}
+
+	payload, err := json.Marshal(activity)
+	if err != nil {
+		http.Error(w, "could not store that reply", http.StatusInternalServerError)
+		return
+	}
+	if err := a.sources.IngestItem(r.Context(), source, payload, &item); err != nil {
+		a.log.Error("could not ingest an ActivityPub reply", "actor", actor.ID, "note", note.ID, "error", err)
+		http.Error(w, "could not store that reply", http.StatusInternalServerError)
+		return
+	}
+
+	a.log.Info("accepted an ActivityPub reply", "actor", actor.ID, "note", note.ID, "to", note.InReplyTo)
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func activityTime(raw string) time.Time {
+	if raw == "" {
+		return time.Time{}
+	}
+	parsed, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return time.Time{}
+	}
+	return parsed.UTC()
 }
 
 func (a *App) authenticateDelivery(r *http.Request, body []byte) (*activitypub.Activity, *activitypub.Actor, error) {
@@ -237,7 +339,7 @@ func (a *App) authenticateDelivery(r *http.Request, body []byte) (*activitypub.A
 		return nil, nil, errors.New("web: the delivery names no actor or type")
 	}
 
-	signature, err := activitypub.ParseSignature(r.Header.Get("Signature"))
+	signature, err := activitypub.ReadSignature(r)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -252,7 +354,7 @@ func (a *App) authenticateDelivery(r *http.Request, body []byte) (*activitypub.A
 		return nil, nil, errors.New("web: " + why)
 	}
 
-	actor, err := a.resolveActor(r, activity.Actor)
+	actor, err := a.remoteActor(r.Context(), 0, activity.Actor)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -264,7 +366,7 @@ func (a *App) authenticateDelivery(r *http.Request, body []byte) (*activitypub.A
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := activitypub.Verify(r, body, key, signature); err != nil {
+	if err := signature.Verify(r, body, key); err != nil {
 		return nil, nil, err
 	}
 	return &activity, actor, nil
@@ -278,16 +380,16 @@ func (a *App) deliveryBlocked(r *http.Request, activity *activitypub.Activity) (
 	return filter.Hides(activity.ID, activity.Actor, "", "")
 }
 
-func (a *App) resolveActor(r *http.Request, uri string) (*activitypub.Actor, error) {
-	if actor, ok := a.ap.CachedActor(r.Context(), uri); ok {
+func (a *App) remoteActor(ctx context.Context, _ int64, uri string) (*activitypub.Actor, error) {
+	if actor, ok := a.ap.CachedActor(ctx, uri); ok {
 		return actor, nil
 	}
 
-	actor, err := a.apClient.FetchActor(r.Context(), uri, a.instanceIdentity(r))
+	actor, err := a.apClient.FetchActor(ctx, uri, a.instanceIdentity(ctx))
 	if err != nil {
 		return nil, err
 	}
-	if err := a.ap.RememberActor(r.Context(), actor); err != nil {
+	if err := a.ap.RememberActor(ctx, actor); err != nil {
 		a.log.Error("could not cache a remote actor", "error", err)
 	}
 	return actor, nil
@@ -307,15 +409,122 @@ func (a *App) acceptFollow(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
-	a.queueAccept(r, accountID, handle, activity, actor)
+	a.queueAccept(context.WithoutCancel(r.Context()), accountID, handle, activity, actor)
 	w.WriteHeader(http.StatusAccepted)
 }
 
-func (a *App) undoFollow(w http.ResponseWriter, r *http.Request,
+func (a *App) acceptReaction(w http.ResponseWriter, r *http.Request,
+	activity *activitypub.Activity, actor *activitypub.Actor) {
+
+	target := activity.ObjectID()
+	if target == "" {
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+	if _, err := a.posts.ByGUID(r.Context(), target); err != nil {
+		a.log.Info("ignored a reaction to something that is not ours",
+			"type", activity.Type, "object", target)
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+
+	if err := a.ap.RecordReaction(r.Context(), target, actor.ID, activity.Type, activity.ID); err != nil {
+		a.log.Error("could not record a reaction", "error", err)
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func (a *App) followingCollection(w http.ResponseWriter, r *http.Request) {
+	_, canonical, err := a.posts.AccountByHandle(r.Context(), r.PathValue("handle"))
+	if err != nil || canonical == "" {
+		http.Error(w, "no such account", http.StatusNotFound)
+		return
+	}
+
+	writeActivityJSON(w, http.StatusOK, orderedCollection{
+		Context:    "https://www.w3.org/ns/activitystreams",
+		ID:         a.actorURI(canonical) + "/following",
+		Type:       "OrderedCollection",
+		TotalItems: 0,
+		Items:      []any{},
+	})
+}
+
+func (a *App) sharedInbox(w http.ResponseWriter, r *http.Request) {
+	if !a.inboxLimit.allow(clientIP(r, a.behindProxy)) {
+		w.Header().Set("Retry-After", "60")
+		http.Error(w, "too many requests", http.StatusTooManyRequests)
+		return
+	}
+
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, inboxMaxBytes))
+	if err != nil {
+		http.Error(w, "that delivery is too large", http.StatusRequestEntityTooLarge)
+		return
+	}
+
+	activity, actor, err := a.authenticateDelivery(r, body)
+	if err != nil {
+		a.log.Warn("refused a shared inbox delivery",
+			"error", err, "ip", clientIP(r, a.behindProxy))
+		http.Error(w, "that delivery could not be authenticated", http.StatusUnauthorized)
+		return
+	}
+	if a.ap.AlreadySeen(r.Context(), activity.ID) {
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+
+	accountID, handle := a.addressee(r, activity)
+	a.dispatch(w, r, accountID, handle, activity, actor)
+}
+
+func (a *App) addressee(r *http.Request, activity *activitypub.Activity) (int64, string) {
+	for _, uri := range append(append([]string{activity.ObjectID()}, activity.To...), activity.Cc...) {
+		handle, ok := strings.CutPrefix(uri, a.posts.BaseURL()+"/users/")
+		if !ok {
+			continue
+		}
+		handle, _, _ = strings.Cut(handle, "/")
+		if accountID, canonical, err := a.posts.AccountByHandle(r.Context(), handle); err == nil && accountID != 0 {
+			return accountID, canonical
+		}
+	}
+
+	if note, err := activity.Note(); err == nil && note.InReplyTo != "" {
+		if post, err := a.posts.ByGUID(r.Context(), note.InReplyTo); err == nil {
+			return post.AccountID, post.Handle
+		}
+	}
+	return 0, ""
+}
+
+func (a *App) undo(w http.ResponseWriter, r *http.Request,
 	accountID int64, activity *activitypub.Activity, actor *activitypub.Actor) {
 
-	if err := a.ap.RemoveFollower(r.Context(), accountID, actor.ID); err != nil {
-		a.log.Error("could not remove a follower", "error", err)
+	undone, err := activity.Undone()
+	if err != nil {
+		a.log.Info("ignored an Undo we could not read", "actor", actor.ID)
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+	if undone.Actor != "" && undone.Actor != actor.ID {
+		http.Error(w, "that undo names somebody else's activity", http.StatusBadRequest)
+		return
+	}
+
+	switch undone.Type {
+	case "Follow":
+		if err := a.ap.RemoveFollower(r.Context(), accountID, actor.ID); err != nil {
+			a.log.Error("could not remove a follower", "error", err)
+		}
+	case "Like", "Announce":
+		if err := a.ap.ForgetReaction(r.Context(), undone.ObjectID(), actor.ID, undone.Type); err != nil {
+			a.log.Error("could not forget a reaction", "error", err)
+		}
+	default:
+		a.log.Info("ignored an Undo of an activity we do not track",
+			"type", undone.Type, "actor", actor.ID)
 	}
 	w.WriteHeader(http.StatusAccepted)
 }

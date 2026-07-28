@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -137,7 +138,8 @@ func (s *Store) recordObservation(ctx context.Context, source *Source, payload [
 
 func (s *Store) Converge(ctx context.Context, key string, now time.Time) (bool, error) {
 	rows, err := s.db.Read.QueryContext(ctx,
-		`select id, claimed_by_author, coalesce(updated_at, published_at, observed_at), fidelity, content_hash
+		`select id, claimed_by_author, coalesce(updated_at, published_at, observed_at),
+		        fidelity, content_hash, coalesce(enclosures, '')
 		 from observation where item_key = ? order by id`, key)
 	if err != nil {
 		return false, err
@@ -147,12 +149,20 @@ func (s *Store) Converge(ctx context.Context, key string, now time.Time) (bool, 
 	var candidates []convergence.Candidate
 	for rows.Next() {
 		var (
-			c       convergence.Candidate
-			claimed int
-			updated int64
+			c          convergence.Candidate
+			claimed    int
+			updated    int64
+			enclosures string
 		)
-		if err := rows.Scan(&c.ID, &claimed, &updated, &c.Fidelity, &c.ContentHash); err != nil {
+		if err := rows.Scan(&c.ID, &claimed, &updated, &c.Fidelity, &c.ContentHash, &enclosures); err != nil {
 			return false, err
+		}
+		if enclosures != "" {
+			var attachments []feed.Enclosure
+			if err := json.Unmarshal([]byte(enclosures), &attachments); err != nil {
+				return false, fmt.Errorf("ingest: decode observation enclosures: %w", err)
+			}
+			c.Attachments = len(attachments)
 		}
 		c.ClaimedByAuthor = claimed == 1
 		c.Updated = time.Unix(updated, 0).UTC()
@@ -255,6 +265,14 @@ func contentHash(item *feed.Item) []byte {
 		h.Write([]byte(part))
 		h.Write([]byte{0})
 	}
+	for _, enclosure := range item.Enclosures {
+		h.Write([]byte(enclosure.URL))
+		h.Write([]byte{0})
+		h.Write([]byte(enclosure.Type))
+		h.Write([]byte{0})
+		h.Write([]byte(strconv.FormatInt(enclosure.Length, 10)))
+		h.Write([]byte{0})
+	}
 	h.Write([]byte(effectiveUpdated(item).UTC().Format(time.RFC3339)))
 	return h.Sum(nil)
 }
@@ -334,6 +352,21 @@ func (s *Store) EnsureLocalSource(ctx context.Context, feedURL, title string) (*
 	_, err = s.db.Write.ExecContext(ctx,
 		`update source set is_local = 1, title = ?, next_poll_at = ? where id = ?`,
 		nullable(title), int64(1)<<62, source.ID)
+	if err != nil {
+		return nil, err
+	}
+	return s.SourceByID(ctx, source.ID)
+}
+
+func (s *Store) EnsureFederatedSource(ctx context.Context, actorURL, title string) (*Source, error) {
+	source, err := s.AddSource(ctx, actorURL)
+	if err != nil {
+		return nil, err
+	}
+	_, err = s.db.Write.ExecContext(ctx,
+		`update source set is_local = 0, protocol = ?, title = ?, site_url = ?
+		 where id = ?`,
+		ProtocolActivityPub, nullable(title), nullable(actorURL), source.ID)
 	if err != nil {
 		return nil, err
 	}

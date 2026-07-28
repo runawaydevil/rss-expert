@@ -132,8 +132,8 @@ func (a *App) refreshSource(w http.ResponseWriter, r *http.Request) {
 		a.sourcesProblem(w, r, "No such source.")
 		return
 	}
-	if source.Local {
-		a.sourcesProblem(w, r, "That is this instance's own feed, not a subscription.")
+	if !source.Subscribed() {
+		a.sourcesProblem(w, r, "That is not a subscription: nothing there is a feed to read.")
 		return
 	}
 
@@ -154,9 +154,17 @@ func (a *App) unsubscribe(w http.ResponseWriter, r *http.Request) {
 		a.sourcesProblem(w, r, "No such source.")
 		return
 	}
-	if source, err := a.sources.SourceByID(ctx, id); err == nil {
-		a.LeaveHub(ctx, source)
+	source, err := a.sources.SourceByID(ctx, id)
+	if err != nil {
+		a.sourcesProblem(w, r, "No such source.")
+		return
 	}
+	if !source.Subscribed() {
+		a.sourcesProblem(w, r, "That is not a subscription: it records where something came from.")
+		return
+	}
+	a.LeaveHub(ctx, source)
+
 	if err := a.sources.RemoveSource(ctx, id); err != nil {
 		a.log.Error("could not remove a source", "id", id, "error", err)
 		a.sourcesProblem(w, r, "It could not be removed: "+err.Error())

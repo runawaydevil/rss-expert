@@ -214,6 +214,40 @@ func TestInviteModeNeedsAValidInvitation(t *testing.T) {
 	}
 }
 
+func TestABadPasswordDoesNotConsumeAnInvitation(t *testing.T) {
+	h, accounts, _ := accountsApp(t, "invite")
+	ctx := context.Background()
+
+	owner, err := accounts.Create(ctx, "owner@example.org", testPassword, identity.RoleOwner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	invite, err := accounts.IssueToken(ctx, owner.ID, "guest@example.org", identity.PurposeInvite)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	csrf, cookies := csrfFrom(t, h, "/register", nil)
+	first := postForm(t, h, "/register", url.Values{
+		"csrf": {csrf}, "email": {"guest@example.org"}, "password": {"short"}, "invite": {invite},
+	}, cookies)
+	if first.StatusCode != http.StatusOK {
+		t.Fatalf("the rejected registration returned %d", first.StatusCode)
+	}
+
+	second := postForm(t, h, "/register", url.Values{
+		"csrf": {csrf}, "email": {"guest@example.org"},
+		"password": {testPassword}, "invite": {invite},
+	}, cookies)
+	if second.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(second.Body)
+		t.Fatalf("the corrected registration could not reuse its invitation: %d\n%s", second.StatusCode, body)
+	}
+	if _, err := accounts.ByEmail(ctx, "guest@example.org"); err != nil {
+		t.Fatalf("the invitation did not create the account after correction: %v", err)
+	}
+}
+
 func TestMagicLinkSignsInAnExistingAccount(t *testing.T) {
 	h, accounts, box := accountsApp(t, "open")
 	ctx := context.Background()
@@ -286,6 +320,40 @@ func TestRecoverSetsANewPasswordAndEndsOtherSessions(t *testing.T) {
 	}
 	if _, err := accounts.Authenticate(ctx, "forgot@example.org", "the old long password"); err == nil {
 		t.Error("the old password still works")
+	}
+}
+
+func TestABadNewPasswordDoesNotConsumeARecoveryLink(t *testing.T) {
+	h, accounts, _ := accountsApp(t, "open")
+	ctx := context.Background()
+
+	account, err := accounts.Create(ctx, "recover@example.org", testPassword, identity.RoleUser)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, err := accounts.IssueToken(ctx, account.ID, account.Email, identity.PurposeRecover)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	link := "/account/recover?token=" + token
+	csrf, cookies := csrfFrom(t, h, link, nil)
+	first := postForm(t, h, "/account/recover", url.Values{
+		"csrf": {csrf}, "token": {token}, "password": {"short"},
+	}, cookies)
+	if first.StatusCode != http.StatusOK {
+		t.Fatalf("the rejected recovery returned %d", first.StatusCode)
+	}
+
+	second := postForm(t, h, "/account/recover", url.Values{
+		"csrf": {csrf}, "token": {token}, "password": {"a corrected long password"},
+	}, cookies)
+	if second.StatusCode != http.StatusSeeOther {
+		body, _ := io.ReadAll(second.Body)
+		t.Fatalf("the corrected recovery could not reuse its link: %d\n%s", second.StatusCode, body)
+	}
+	if _, err := accounts.Authenticate(ctx, account.Email, "a corrected long password"); err != nil {
+		t.Fatalf("the corrected password does not work: %v", err)
 	}
 }
 

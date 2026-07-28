@@ -47,8 +47,9 @@ func NewClient(o ClientOptions) *Client {
 }
 
 type Identity struct {
-	KeyID string
-	Key   *rsa.PrivateKey
+	KeyID   string
+	Key     *rsa.PrivateKey
+	Signing string
 }
 
 func (c *Client) FetchActor(ctx context.Context, uri string, as Identity) (*Actor, error) {
@@ -92,7 +93,7 @@ func (c *Client) get(ctx context.Context, uri string, as Identity) ([]byte, erro
 	req.Header.Set("Accept", ContentType+", "+LDType+", "+JRDType)
 
 	if as.Key != nil {
-		if err := Sign(req, as.KeyID, as.Key, nil); err != nil {
+		if err := signAs(as.Signing, req, as.KeyID, as.Key, nil); err != nil {
 			return nil, err
 		}
 	}
@@ -112,29 +113,52 @@ func (c *Client) get(ctx context.Context, uri string, as Identity) ([]byte, erro
 	return io.ReadAll(resp.Body)
 }
 
-func (c *Client) Deliver(ctx context.Context, inbox string, document []byte, as Identity) error {
+func (c *Client) Deliver(ctx context.Context, inbox string, document []byte, as Identity) (string, error) {
+	scheme := as.Signing
+	if scheme != Signing9421 {
+		scheme = SigningCavage
+	}
+
+	status, err := c.deliverOnce(ctx, inbox, document, as, scheme)
+	if err == nil {
+		return scheme, nil
+	}
+	if status != http.StatusUnauthorized && status != http.StatusForbidden {
+		return scheme, err
+	}
+
+	knock := theOther(scheme)
+	if _, second := c.deliverOnce(ctx, inbox, document, as, knock); second == nil {
+		return knock, nil
+	}
+	return scheme, err
+}
+
+func (c *Client) deliverOnce(ctx context.Context, inbox string, document []byte,
+	as Identity, scheme string) (int, error) {
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, inbox, bytes.NewReader(document))
 	if err != nil {
-		return err
+		return 0, err
 	}
 	req.Header.Set("Content-Type", ContentType)
 	req.Header.Set("Accept", ContentType)
 
-	if err := Sign(req, as.KeyID, as.Key, document); err != nil {
-		return err
+	if err := signAs(scheme, req, as.KeyID, as.Key, document); err != nil {
+		return 0, err
 	}
 
 	resp, err := c.fetcher.Do(req)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		return nil
+		return resp.StatusCode, nil
 	}
 	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
-		return ErrRedirect
+		return resp.StatusCode, ErrRedirect
 	}
-	return fmt.Errorf("%w: %s answered %d", ErrRefused, inbox, resp.StatusCode)
+	return resp.StatusCode, fmt.Errorf("%w: %s answered %d", ErrRefused, inbox, resp.StatusCode)
 }

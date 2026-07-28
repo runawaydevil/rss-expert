@@ -135,6 +135,20 @@ func (s *Store) Timeline(ctx context.Context, limit int, before time.Time) ([]It
 	return out, rows.Err()
 }
 
+func (s *Store) FederatedAuthor(ctx context.Context, key string) (string, bool) {
+	var actor string
+	err := s.db.Read.QueryRowContext(ctx,
+		`select s.feed_url
+		 from logical_item l
+		 join observation o on o.id = l.winner_id
+		 join source s on s.id = o.source_id
+		 where l.item_key = ? and s.protocol = ?`, key, ProtocolActivityPub).Scan(&actor)
+	if err != nil || actor == "" {
+		return "", false
+	}
+	return actor, true
+}
+
 func (s *Store) Item(ctx context.Context, key string) (Item, error) {
 	row := s.db.Read.QueryRowContext(ctx,
 		`select `+itemColumns+`

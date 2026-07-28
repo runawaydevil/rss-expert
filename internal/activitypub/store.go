@@ -225,3 +225,81 @@ func nullable(s string) any {
 	}
 	return s
 }
+
+func (s *Store) RecordReaction(ctx context.Context, itemKey, actor, kind, activityID string) error {
+	_, err := s.db.Write.ExecContext(ctx,
+		`insert into reaction (item_key, actor, kind, activity_id, created_at)
+		 values (?, ?, ?, ?, ?)
+		 on conflict (item_key, actor, kind) do update set
+		   activity_id = excluded.activity_id`,
+		itemKey, actor, kind, activityID, time.Now().UTC().Unix())
+	if err != nil {
+		return fmt.Errorf("activitypub: record reaction: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) ForgetReaction(ctx context.Context, itemKey, actor, kind string) error {
+	_, err := s.db.Write.ExecContext(ctx,
+		`delete from reaction where item_key = ? and actor = ? and kind = ?`,
+		itemKey, actor, kind)
+	return err
+}
+
+type Reactions struct {
+	Likes  int
+	Boosts int
+}
+
+func (s *Store) ReactionsTo(ctx context.Context, itemKey string) (Reactions, error) {
+	rows, err := s.db.Read.QueryContext(ctx,
+		`select kind, count(*) from reaction where item_key = ? group by kind`, itemKey)
+	if err != nil {
+		return Reactions{}, err
+	}
+	defer rows.Close()
+
+	var counted Reactions
+	for rows.Next() {
+		var (
+			kind string
+			n    int
+		)
+		if err := rows.Scan(&kind, &n); err != nil {
+			return Reactions{}, err
+		}
+		switch kind {
+		case "Like":
+			counted.Likes = n
+		case "Announce":
+			counted.Boosts = n
+		}
+	}
+	return counted, rows.Err()
+}
+
+func (s *Store) SigningFor(ctx context.Context, inbox string) string {
+	host := hostOf(inbox)
+	if host == "" {
+		return SigningCavage
+	}
+
+	var scheme string
+	err := s.db.Read.QueryRowContext(ctx,
+		`select signing from remote_host where host = ?`, host).Scan(&scheme)
+	if err != nil || (scheme != SigningCavage && scheme != Signing9421) {
+		return SigningCavage
+	}
+	return scheme
+}
+
+func (s *Store) RememberSigning(ctx context.Context, inbox, scheme string) {
+	host := hostOf(inbox)
+	if host == "" {
+		return
+	}
+	_, _ = s.db.Write.ExecContext(ctx,
+		`insert into remote_host (host, signing, updated_at) values (?, ?, ?)
+		 on conflict (host) do update set signing = excluded.signing, updated_at = excluded.updated_at`,
+		host, scheme, time.Now().UTC().Unix())
+}

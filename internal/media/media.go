@@ -292,10 +292,27 @@ func (s *Store) ForAccount(ctx context.Context, accountID int64, limit int) ([]*
 }
 
 func (s *Store) Attach(ctx context.Context, postID, mediaID int64, position int) error {
-	_, err := s.db.Write.ExecContext(ctx,
-		`insert into post_media (post_id, media_id, position) values (?, ?, ?)
-		 on conflict do nothing`, postID, mediaID, position)
-	return err
+	res, err := s.db.Write.ExecContext(ctx,
+		`insert into post_media (post_id, media_id, position)
+		 select p.id, m.id, ?
+		 from post p join media m on m.id = ?
+		 where p.id = ? and p.account_id = m.account_id
+		 on conflict do nothing`,
+		position, mediaID, postID)
+	if err != nil {
+		return err
+	}
+	if attached, _ := res.RowsAffected(); attached == 0 {
+		var exists int
+		err := s.db.Read.QueryRowContext(ctx,
+			`select count(*) from post_media where post_id = ? and media_id = ?`,
+			postID, mediaID).Scan(&exists)
+		if err == nil && exists > 0 {
+			return nil
+		}
+		return ErrNotYours
+	}
+	return nil
 }
 
 func (s *Store) ForPosts(ctx context.Context, postIDs []int64) (map[int64][]*File, error) {

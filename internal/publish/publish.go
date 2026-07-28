@@ -101,6 +101,17 @@ func (s *Store) project(ctx context.Context, post *Post) error {
 	return s.sources.IngestItem(ctx, source, []byte(post.Markdown), &item)
 }
 
+func (s *Store) RefreshProjection(ctx context.Context, id int64) (*Post, error) {
+	post, err := s.ByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.project(ctx, post); err != nil {
+		return nil, err
+	}
+	return post, nil
+}
+
 var _ = feed.Item{}
 
 func (s *Store) baseURL() string { return s.base }
@@ -237,17 +248,20 @@ func (s *Store) Update(ctx context.Context, account *identity.Account, id int64,
 	return post, nil
 }
 
-func (s *Store) Delete(ctx context.Context, account *identity.Account, id int64) error {
+func (s *Store) Delete(ctx context.Context, account *identity.Account, id int64) (*Post, error) {
 	post, err := s.ByID(ctx, id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if post.AccountID != account.ID && !account.Role.CanModerate() {
-		return ErrNotYours
+		return nil, ErrNotYours
 	}
-	_, err = s.db.Write.ExecContext(ctx,
-		`update post set deleted_at = ? where id = ?`, time.Now().UTC().Unix(), id)
-	return err
+	if _, err := s.db.Write.ExecContext(ctx,
+		`update post set deleted_at = ? where id = ?`, time.Now().UTC().Unix(), id); err != nil {
+		return nil, fmt.Errorf("publish: withdraw post: %w", err)
+	}
+	post.Deleted = true
+	return post, nil
 }
 
 const postColumns = `p.id, p.account_id, coalesce(a.handle, ''), a.email, p.guid,
@@ -309,17 +323,27 @@ func (s *Store) query(ctx context.Context, where string, args ...any) ([]*Post, 
 
 func (s *Store) ByHandle(ctx context.Context, handle string, limit int) ([]*Post, error) {
 	return s.query(ctx,
-		`where a.handle = ? and p.deleted_at is null order by p.published_at desc limit ?`,
+		`where a.handle = ? and p.deleted_at is null order by p.published_at desc, p.id desc limit ?`,
 		handle, limit)
 }
 
+func (s *Store) CountByHandle(ctx context.Context, handle string) (int, error) {
+	var count int
+	err := s.db.Read.QueryRowContext(ctx,
+		`select count(*) from post p
+		 join account a on a.id = p.account_id
+		 where a.handle = ? and p.deleted_at is null`,
+		handle).Scan(&count)
+	return count, err
+}
+
 func (s *Store) Recent(ctx context.Context, limit int) ([]*Post, error) {
-	return s.query(ctx, `where p.deleted_at is null order by p.published_at desc limit ?`, limit)
+	return s.query(ctx, `where p.deleted_at is null order by p.published_at desc, p.id desc limit ?`, limit)
 }
 
 func (s *Store) Replies(ctx context.Context, guid string, limit int) ([]*Post, error) {
 	return s.query(ctx,
-		`where p.in_reply_to = ? and p.deleted_at is null order by p.published_at limit ?`,
+		`where p.in_reply_to = ? and p.deleted_at is null order by p.published_at, p.id limit ?`,
 		guid, limit)
 }
 

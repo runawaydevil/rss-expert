@@ -158,7 +158,9 @@ func (a *App) Handler() http.Handler {
 	if a.federates {
 		mux.HandleFunc("GET /.well-known/webfinger", a.throttle(a.webfinger))
 		mux.HandleFunc("POST /users/{handle}/inbox", a.inbox)
+		mux.HandleFunc("POST /inbox", a.sharedInbox)
 		mux.HandleFunc("GET /users/{handle}/followers", a.throttle(a.followersCollection))
+		mux.HandleFunc("GET /users/{handle}/following", a.throttle(a.followingCollection))
 		mux.HandleFunc("GET /users/{handle}/outbox", a.throttle(a.outboxCollection))
 	}
 	mux.HandleFunc("GET /users/rss.xml", a.firehoseFeed)
@@ -172,6 +174,9 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /p/{id}", a.postPage)
 	mux.HandleFunc("GET /p/{id}/replies.xml", a.repliesFeed)
 	mux.HandleFunc("GET /p/{id}/journey", a.journey)
+	mux.HandleFunc("GET /p/{id}/edit", a.auth.requireAccount(a.editForm))
+	mux.HandleFunc("POST /p/{id}/edit", a.auth.requireAccount(a.submitEdit))
+	mux.HandleFunc("POST /p/{id}/withdraw", a.auth.requireAccount(a.withdrawPost))
 
 	mux.HandleFunc("POST /webmention", a.throttle(a.receiveWebmention))
 

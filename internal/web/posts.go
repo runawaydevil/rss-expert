@@ -100,8 +100,14 @@ func (a *App) postPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	mine := false
+	if account := accountFrom(r.Context()); account != nil {
+		mine = post.AccountID == account.ID || account.Role.CanModerate()
+	}
+
 	a.render(w, r, "post.html", map[string]any{
 		"Title":      title + " — RSS Expert",
+		"Mine":       mine,
 		"Post":       localView(post),
 		"Replies":    localViews(replies),
 		"Thread":     branches,
@@ -160,7 +166,13 @@ func (a *App) submitWrite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.attachToPost(r.Context(), post.ID, r.PostForm["media"])
+	if projected, err := a.posts.RefreshProjection(r.Context(), post.ID); err != nil {
+		a.log.Error("could not refresh the published item after attaching media", "post", post.ID, "error", err)
+	} else {
+		post = projected
+	}
 	a.posts.DropDraft(r.Context(), account.ID)
+	a.afterPublish(r, post)
 
 	a.log.Info("published", "post", post.ID, "account", account.Email, "reply", post.InReplyTo != "")
 	http.Redirect(w, r, "/p/"+strconv.FormatInt(post.ID, 10), http.StatusSeeOther)
@@ -213,4 +225,90 @@ func (a *App) writeData(r *http.Request, inReplyTo, title, source, problem strin
 		}
 	}
 	return data
+}
+
+func (a *App) editForm(w http.ResponseWriter, r *http.Request) {
+	post, ok := a.ownPost(w, r)
+	if !ok {
+		return
+	}
+
+	data := a.writeData(r, post.InReplyTo, post.Title, post.Markdown, "")
+	data["Title"] = "Edit — RSS Expert"
+	data["Editing"] = localView(post)
+	a.render(w, r, "write.html", data)
+}
+
+func (a *App) submitEdit(w http.ResponseWriter, r *http.Request) {
+	post, ok := a.ownPost(w, r)
+	if !ok {
+		return
+	}
+	if err := r.ParseForm(); err != nil || !validCSRF(r) {
+		http.Error(w, "that form expired", http.StatusBadRequest)
+		return
+	}
+
+	account := accountFrom(r.Context())
+	edited, err := a.posts.Update(r.Context(), account,
+		post.ID, r.PostFormValue("title"), r.PostFormValue("markdown"))
+	if err != nil {
+		data := a.writeData(r, post.InReplyTo, r.PostFormValue("title"), r.PostFormValue("markdown"), err.Error())
+		data["Title"] = "Edit — RSS Expert"
+		data["Editing"] = localView(post)
+		a.render(w, r, "write.html", data)
+		return
+	}
+
+	a.afterEdit(r, edited)
+	a.log.Info("post edited", "post", edited.ID, "account", account.Email)
+	http.Redirect(w, r, "/p/"+strconv.FormatInt(edited.ID, 10), http.StatusSeeOther)
+}
+
+func (a *App) withdrawPost(w http.ResponseWriter, r *http.Request) {
+	post, ok := a.ownPost(w, r)
+	if !ok {
+		return
+	}
+	if err := r.ParseForm(); err != nil || !validCSRF(r) {
+		http.Error(w, "that form expired", http.StatusBadRequest)
+		return
+	}
+
+	account := accountFrom(r.Context())
+	withdrawn, err := a.posts.Delete(r.Context(), account, post.ID)
+	if err != nil {
+		http.Error(w, "it could not be withdrawn", http.StatusForbidden)
+		return
+	}
+
+	a.afterWithdraw(r, withdrawn)
+	a.log.Info("post withdrawn", "post", withdrawn.ID, "account", account.Email)
+	a.render(w, r, "outcome.html", map[string]any{
+		"Title":   "Withdrawn — RSS Expert",
+		"Heading": "That post is withdrawn",
+		"Message": "It is gone from your feed, and everyone following you was told. " +
+			"Whoever already read it may still have a copy.",
+	})
+}
+
+func (a *App) ownPost(w http.ResponseWriter, r *http.Request) (*publish.Post, bool) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.NotFound(w, r)
+		return nil, false
+	}
+
+	post, err := a.posts.ByID(r.Context(), id)
+	if err != nil || post.Deleted {
+		http.NotFound(w, r)
+		return nil, false
+	}
+
+	account := accountFrom(r.Context())
+	if account == nil || (post.AccountID != account.ID && !account.Role.CanModerate()) {
+		http.Error(w, "that post belongs to someone else", http.StatusForbidden)
+		return nil, false
+	}
+	return post, true
 }

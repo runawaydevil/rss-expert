@@ -57,6 +57,23 @@ func (s *Store) IssueToken(ctx context.Context, accountID int64, email, purpose 
 }
 
 func (s *Store) RedeemToken(ctx context.Context, value, purpose string) (*Token, error) {
+	tx, err := s.db.Write.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	token, err := redeemTokenTx(ctx, tx, value, purpose)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return token, nil
+}
+
+func redeemTokenTx(ctx context.Context, tx *sql.Tx, value, purpose string) (*Token, error) {
 	sum := sha256.Sum256([]byte(value))
 
 	var (
@@ -66,7 +83,7 @@ func (s *Store) RedeemToken(ctx context.Context, value, purpose string) (*Token,
 		expires   int64
 		used      sql.NullInt64
 	)
-	err := s.db.Read.QueryRowContext(ctx,
+	err := tx.QueryRowContext(ctx,
 		`select id, account_id, email, expires_at, used_at from email_token
 		 where token_hash = ? and purpose = ?`, sum[:], purpose).
 		Scan(&id, &accountID, &token.Email, &expires, &used)
@@ -83,7 +100,7 @@ func (s *Store) RedeemToken(ctx context.Context, value, purpose string) (*Token,
 		return nil, ErrTokenExpired
 	}
 
-	res, err := s.db.Write.ExecContext(ctx,
+	res, err := tx.ExecContext(ctx,
 		`update email_token set used_at = ? where id = ? and used_at is null`,
 		time.Now().UTC().Unix(), id)
 	if err != nil {

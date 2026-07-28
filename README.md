@@ -82,6 +82,7 @@ Commands
     rss-expert restore --from DIR           into an empty data directory
     rss-expert restore --from DIR --check   verify without changing anything
     rss-expert sources add URL              subscribe from the shell
+    rss-expert sources remove ID            unsubscribe by source ID
                                             (the browser does this too, at /sources)
     rss-expert version
 
@@ -146,9 +147,13 @@ by push are polled on an adapting schedule with conditional requests.
 
 Set RSS_EXPERT_ACTIVITYPUB and @handle@yourdomain becomes an address the
 fediverse can follow: WebFinger, an actor document, a signed inbox, and one
-Create per follower when you publish. Only being followed works so far; replies
-from Mastodon land in stage 2. Off means the routes do not exist, not that they
-answer politely.
+Create per follower when you publish. The outbox carries recent Create
+activities, and signed Note replies to a local post enter the same thread as
+replies learned from feeds. The actor that answered is recorded as provenance,
+not as a subscription: it never joins the list of feeds this instance follows
+and is never polled as though it were one. Answering a remote post from here is
+still to come. Off means the routes do not exist, not that they answer
+politely.
 
 Settle the domain before turning it on. Actor, key and post identifiers are
 absolute URLs on it and every receiver enforces origin matching, so moving

@@ -247,6 +247,43 @@ func TestChangingPasswordEndsEverySession(t *testing.T) {
 	}
 }
 
+func TestFailedInvitedRegistrationDoesNotConsumeTheInvitation(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+
+	if _, err := s.Create(ctx, "member@example.org", "a long enough password", RoleUser); err != nil {
+		t.Fatal(err)
+	}
+	invite, err := s.IssueToken(ctx, 0, "member@example.org", PurposeInvite)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.CreateWithInvite(ctx, "member@example.org",
+		"another long password", RoleUser, invite); !errors.Is(err, ErrEmailTaken) {
+		t.Fatalf("registration returned %v, want ErrEmailTaken", err)
+	}
+	if _, err := s.PeekToken(ctx, invite, PurposeInvite); err != nil {
+		t.Fatalf("the rolled-back registration consumed its invitation: %v", err)
+	}
+}
+
+func TestFailedRecoveryDoesNotConsumeTheToken(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+
+	token, err := s.IssueToken(ctx, 0, "missing@example.org", PurposeRecover)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.RecoverPassword(ctx, token, "a long enough password"); !errors.Is(err, ErrNoAccount) {
+		t.Fatalf("recovery returned %v, want ErrNoAccount", err)
+	}
+	if _, err := s.PeekToken(ctx, token, PurposeRecover); err != nil {
+		t.Fatalf("the rolled-back recovery consumed its token: %v", err)
+	}
+}
+
 func TestBootstrapCreatesOwnerOnce(t *testing.T) {
 	s := testStore(t)
 	ctx := context.Background()

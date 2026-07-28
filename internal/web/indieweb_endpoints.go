@@ -138,6 +138,11 @@ func (a *App) micropubCreate(w http.ResponseWriter, r *http.Request, token *micr
 	}
 
 	a.attachByURL(r.Context(), post.ID, token.Account.ID, request.Media)
+	if projected, err := a.posts.RefreshProjection(r.Context(), post.ID); err != nil {
+		a.log.Error("could not refresh the micropub item after attaching media", "post", post.ID, "error", err)
+	} else {
+		post = projected
+	}
 
 	a.afterPublish(r, post)
 	a.log.Info("published over micropub", "post", post.ID, "client", token.ClientID)
@@ -176,7 +181,7 @@ func (a *App) micropubUpdate(w http.ResponseWriter, r *http.Request, token *micr
 		return
 	}
 
-	a.afterPublish(r, updated)
+	a.afterEdit(r, updated)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -191,10 +196,13 @@ func (a *App) micropubDelete(w http.ResponseWriter, r *http.Request, token *micr
 		micropubError(w, http.StatusNotFound, "not_found", "no such post")
 		return
 	}
-	if err := a.posts.Delete(r.Context(), token.Account, post.ID); err != nil {
+	withdrawn, err := a.posts.Delete(r.Context(), token.Account, post.ID)
+	if err != nil {
 		micropubError(w, http.StatusForbidden, "forbidden", err.Error())
 		return
 	}
+
+	a.afterWithdraw(r, withdrawn)
 	w.WriteHeader(http.StatusNoContent)
 }
 

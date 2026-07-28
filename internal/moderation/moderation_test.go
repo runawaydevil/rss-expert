@@ -105,6 +105,9 @@ func TestDomainBlockIsNormalised(t *testing.T) {
 			t.Errorf("%s slipped past the domain block", link)
 		}
 	}
+	if hidden, _ := filter.Hides("opaque-id", "", "https://spam.example/feed.xml", ""); !hidden {
+		t.Error("an item with only a blocked feed domain slipped through")
+	}
 	if hidden, _ := filter.Hides("https://notspam.example/p/1", "https://notspam.example/p/1", "", ""); hidden {
 		t.Error("an unrelated domain was blocked")
 	}

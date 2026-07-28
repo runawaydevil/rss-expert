@@ -19,6 +19,7 @@ const (
 	ReasonAuthorOrigin  = "came from the author's own domain"
 	ReasonNewer         = "carries the later updated time"
 	ReasonFidelity      = "carries more of the original than the others"
+	ReasonAttachments   = "carries more attachments than the others"
 	ReasonHash          = "tied on every rule; lowest content hash wins"
 )
 
@@ -29,6 +30,7 @@ type Candidate struct {
 	ClaimedByAuthor bool
 	Updated         time.Time
 	Fidelity        int
+	Attachments     int
 	ContentHash     []byte
 }
 
@@ -75,6 +77,9 @@ func beats(a, b Candidate) (bool, Reason) {
 	}
 	if a.Fidelity != b.Fidelity {
 		return a.Fidelity > b.Fidelity, ReasonFidelity
+	}
+	if a.Attachments != b.Attachments {
+		return a.Attachments > b.Attachments, ReasonAttachments
 	}
 	return bytes.Compare(a.ContentHash, b.ContentHash) < 0, ReasonHash
 }

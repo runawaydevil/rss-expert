@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/runawaydevil/rss-expert/internal/activitypub"
@@ -58,18 +59,35 @@ func (a *App) afterPublish(r *http.Request, post *publish.Post) {
 	}
 }
 
+func (a *App) afterEdit(r *http.Request, post *publish.Post) {
+	ctx := context.WithoutCancel(r.Context())
+	a.announce(ctx, post)
+	a.AnnounceEdit(ctx, post)
+}
+
+func (a *App) afterWithdraw(r *http.Request, post *publish.Post) {
+	ctx := context.WithoutCancel(r.Context())
+	a.announce(ctx, post)
+	a.AnnounceWithdrawal(ctx, post)
+}
+
 func (a *App) announce(ctx context.Context, post *publish.Post) {
+	for _, topic := range a.announcementTopics(ctx, post) {
+		go a.Distribute(ctx, topic)
+	}
+}
+
+func (a *App) announcementTopics(ctx context.Context, post *publish.Post) []string {
 	topics := []string{a.posts.FirehoseURL()}
 	if post.Handle != "" {
 		topics = append(topics, a.posts.AccountFeedURL(post.Handle))
 	}
 	if post.InReplyTo != "" {
-		topics = append(topics, a.posts.RepliesURL(post.ID))
+		if parent, err := a.posts.ByGUID(ctx, post.InReplyTo); err == nil {
+			topics = append(topics, a.posts.RepliesURL(parent.ID))
+		}
 	}
-
-	for _, topic := range topics {
-		go a.Distribute(ctx, topic)
-	}
+	return topics
 }
 
 type Deliverer struct {
@@ -80,6 +98,7 @@ type Deliverer struct {
 	mentions *webmention.Store
 	ledger   *ledger.Ledger
 	log      *slog.Logger
+	keys     sync.Map
 }
 
 func NewDeliverer(app *App) *Deliverer {

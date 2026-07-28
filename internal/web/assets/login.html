@@ -24,6 +24,11 @@
 			<label for="password">Password</label>
 			<input id="password" name="password" type="password" autocomplete="current-password" required>
 
+			<label for="code">Two-factor or recovery code
+				<span class="optional">only if you switched two-factor on</span></label>
+			<input id="code" name="code" type="text" autocomplete="one-time-code"
+				inputmode="numeric" spellcheck="false">
+
 			<button type="submit" class="button-primary">Sign in</button>
 
 			<p class="form-aside">Reading needs no account. Sign in to reply, save and follow.</p>

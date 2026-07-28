@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/runawaydevil/rss-expert/internal/identity"
 	"github.com/runawaydevil/rss-expert/internal/store"
@@ -192,6 +193,49 @@ func TestWrongPasswordDoesNotStartASession(t *testing.T) {
 	}
 	if strings.Contains(string(body), "no such account") {
 		t.Error("the page distinguishes an unknown address from a wrong password")
+	}
+}
+
+func TestTwoFactorIsRequiredDuringNormalSignIn(t *testing.T) {
+	h, accounts := testAppWithAccounts(t)
+	ctx := context.Background()
+
+	account, err := accounts.Create(ctx, "owner@example.org", testPassword, identity.RoleOwner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret, err := accounts.BeginTOTP(ctx, account)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := identity.TOTPCode(secret, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	recovery, err := accounts.ConfirmTOTP(ctx, account, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	csrf, cookies := loginForm(t, h)
+	withoutCode := postForm(t, h, "/login", url.Values{
+		"csrf": {csrf}, "email": {account.Email}, "password": {testPassword},
+	}, cookies)
+	if cookieNamed(withoutCode.Cookies(), sessionCookieName) != nil {
+		t.Fatal("a two-factor account signed in with only its password")
+	}
+	body, _ := io.ReadAll(withoutCode.Body)
+	if !strings.Contains(string(body), "two-factor or recovery code") {
+		t.Fatalf("the sign-in form did not explain the missing second factor:\n%s", body)
+	}
+
+	withRecovery := postForm(t, h, "/login", url.Values{
+		"csrf": {csrf}, "email": {account.Email}, "password": {testPassword},
+		"code": {recovery[0]},
+	}, cookies)
+	if cookieNamed(withRecovery.Cookies(), sessionCookieName) == nil {
+		body, _ := io.ReadAll(withRecovery.Body)
+		t.Fatalf("a valid recovery code did not sign in:\n%s", body)
 	}
 }
 

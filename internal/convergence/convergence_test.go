@@ -82,6 +82,21 @@ func TestFidelityBreaksATimeTie(t *testing.T) {
 	}
 }
 
+func TestAttachmentsBreakAnOtherwiseEqualTie(t *testing.T) {
+	when := at("2026-07-23T12:00:00Z")
+	withoutAttachment := Candidate{
+		ID: 1, Updated: when, Fidelity: FidelityMarkdown, ContentHash: hash("aaa"),
+	}
+	withAttachment := Candidate{
+		ID: 2, Updated: when, Fidelity: FidelityMarkdown, Attachments: 1, ContentHash: hash("zzz"),
+	}
+
+	got, _ := Resolve([]Candidate{withoutAttachment, withAttachment})
+	if got.Winner.ID != 2 || got.Reason != ReasonAttachments {
+		t.Errorf("got %+v, want the copy carrying the attachment", got)
+	}
+}
+
 func TestHashBreaksEveryOtherTie(t *testing.T) {
 	when := at("2026-07-23T12:00:00Z")
 	high := Candidate{ID: 1, Updated: when, Fidelity: FidelityHTML, ContentHash: []byte{0xff, 0x00}}

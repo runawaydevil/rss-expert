@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/url"
@@ -126,6 +127,7 @@ func (a *App) verifySite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.moderation.Log(ctx, account, "site.verify", site.Host, "")
+	a.AnnounceProfile(context.WithoutCancel(ctx), account.ID, handle)
 	http.Redirect(w, r, "/settings/sites", http.StatusSeeOther)
 }
 
@@ -152,6 +154,9 @@ func (a *App) releaseSite(w http.ResponseWriter, r *http.Request) {
 		a.log.Error("could not release a site", "error", err)
 	}
 	a.moderation.Log(ctx, account, "site.release", strconv.FormatInt(id, 10), "")
+	if handle, err := a.posts.HandleFor(ctx, account.ID); err == nil && handle != "" {
+		a.AnnounceProfile(context.WithoutCancel(ctx), account.ID, handle)
+	}
 	http.Redirect(w, r, "/settings/sites", http.StatusSeeOther)
 }
 

@@ -93,8 +93,16 @@ func (s *Store) Create(ctx context.Context, email, password string, role Role) (
 		return nil, err
 	}
 
+	return createAccount(ctx, s.db.Write, email, hash, role)
+}
+
+type accountExecer interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
+func createAccount(ctx context.Context, db accountExecer, email, hash string, role Role) (*Account, error) {
 	now := time.Now().UTC()
-	res, err := s.db.Write.ExecContext(ctx,
+	res, err := db.ExecContext(ctx,
 		`insert into account (email, email_folded, password_hash, role, created_at)
 		 values (?, ?, ?, ?, ?)`,
 		strings.TrimSpace(email), fold(email), hash, string(role), now.Unix())
@@ -113,6 +121,41 @@ func (s *Store) Create(ctx context.Context, email, password string, role Role) (
 		return nil, err
 	}
 	return &Account{ID: id, Email: strings.TrimSpace(email), Role: role, CreatedAt: now}, nil
+}
+
+func (s *Store) CreateWithInvite(ctx context.Context, email, password string, role Role, invite string) (*Account, error) {
+	if err := usableEmail(email); err != nil {
+		return nil, err
+	}
+	if !role.Valid() {
+		return nil, ErrRoleNotSupported
+	}
+	hash, err := HashPassword(password)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := s.db.Write.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	token, err := redeemTokenTx(ctx, tx, invite, PurposeInvite)
+	if err != nil || !strings.EqualFold(token.Email, strings.TrimSpace(email)) {
+		if err == nil {
+			err = ErrBadToken
+		}
+		return nil, err
+	}
+	account, err := createAccount(ctx, tx, email, hash, role)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return account, nil
 }
 
 func (s *Store) Authenticate(ctx context.Context, email, password string) (*Account, error) {
@@ -224,6 +267,40 @@ func (s *Store) SetPassword(ctx context.Context, id int64, password string) erro
 		return ErrNoAccount
 	}
 	return s.destroyAllSessions(ctx, id)
+}
+
+func (s *Store) RecoverPassword(ctx context.Context, token, password string) (int64, error) {
+	hash, err := HashPassword(password)
+	if err != nil {
+		return 0, err
+	}
+
+	tx, err := s.db.Write.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	redeemed, err := redeemTokenTx(ctx, tx, token, PurposeRecover)
+	if err != nil {
+		return 0, err
+	}
+	res, err := tx.ExecContext(ctx,
+		`update account set password_hash = ? where id = ?`, hash, redeemed.AccountID)
+	if err != nil {
+		return 0, fmt.Errorf("identity: set password: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return 0, ErrNoAccount
+	}
+	if _, err := tx.ExecContext(ctx,
+		`delete from session where account_id = ?`, redeemed.AccountID); err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return redeemed.AccountID, nil
 }
 
 func violatesUnique(err error, column string) bool {

@@ -19,8 +19,14 @@ const (
 	MaxFailuresBeforeBackoff = 3
 )
 
+const (
+	ProtocolFeed        = "feed"
+	ProtocolActivityPub = "activitypub"
+)
+
 var (
 	ErrSourceIsLocal   = errors.New("ingest: that is this instance's own feed, not a subscription")
+	ErrNotSubscribed   = errors.New("ingest: that source is provenance, not a subscription")
 	ErrNoSource        = errors.New("no such source")
 	ErrSourceExists    = errors.New("this instance already follows that feed")
 	ErrFeedURLUnusable = errors.New("that is not a usable feed address")
@@ -42,7 +48,10 @@ type Source struct {
 	NextPollAt   time.Time
 	Quarantined  bool
 	Local        bool
+	Protocol     string
 }
+
+func (s *Source) Subscribed() bool { return !s.Local && s.Protocol == ProtocolFeed }
 
 func (s *Source) Host() string {
 	u, err := url.Parse(s.FeedURL)
@@ -102,7 +111,8 @@ func (s *Store) AddSource(ctx context.Context, feedURL string) (*Source, error) 
 const sourceColumns = `id, feed_url, coalesce(site_url, ''), coalesce(title, ''),
 	coalesce(self_url, ''), coalesce(etag, ''), coalesce(last_modified, ''),
 	coalesce(last_fetch_at, 0), coalesce(last_status, 0), coalesce(last_error, ''),
-	failure_count, poll_interval, next_poll_at, quarantined_at is not null, is_local`
+	failure_count, poll_interval, next_poll_at, quarantined_at is not null, is_local,
+	protocol`
 
 func scanSource(row interface{ Scan(...any) error }) (*Source, error) {
 	var (
@@ -113,7 +123,7 @@ func scanSource(row interface{ Scan(...any) error }) (*Source, error) {
 	)
 	err := row.Scan(&s.ID, &s.FeedURL, &s.SiteURL, &s.Title, &s.SelfURL, &s.ETag,
 		&s.LastModified, &lastFetch, &s.LastStatus, &s.LastError, &s.FailureCount,
-		&pollInterval, &nextPoll, &s.Quarantined, &s.Local)
+		&pollInterval, &nextPoll, &s.Quarantined, &s.Local, &s.Protocol)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +155,8 @@ func (s *Store) SourceByURL(ctx context.Context, feedURL string) (*Source, error
 
 func (s *Store) Sources(ctx context.Context) ([]*Source, error) {
 	rows, err := s.db.Read.QueryContext(ctx,
-		`select `+sourceColumns+` from source where is_local = 0 order by id`)
+		`select `+sourceColumns+` from source
+		 where is_local = 0 and protocol = ? order by id`, ProtocolFeed)
 	if err != nil {
 		return nil, err
 	}
@@ -165,8 +176,9 @@ func (s *Store) Sources(ctx context.Context) ([]*Source, error) {
 func (s *Store) Due(ctx context.Context, now time.Time, limit int) ([]*Source, error) {
 	rows, err := s.db.Read.QueryContext(ctx,
 		`select `+sourceColumns+` from source
-		 where quarantined_at is null and is_local = 0 and next_poll_at <= ?
-		 order by next_poll_at limit ?`, now.Unix(), limit)
+		 where quarantined_at is null and is_local = 0 and protocol = ?
+		   and next_poll_at <= ?
+		 order by next_poll_at limit ?`, ProtocolFeed, now.Unix(), limit)
 	if err != nil {
 		return nil, err
 	}
