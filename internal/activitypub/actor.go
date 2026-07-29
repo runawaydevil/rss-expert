@@ -24,21 +24,37 @@ var defaultContext = []any{
 }
 
 type Actor struct {
-	Context           any        `json:"@context,omitempty"`
-	ID                string     `json:"id"`
-	Type              string     `json:"type"`
-	PreferredUsername string     `json:"preferredUsername"`
-	Name              string     `json:"name,omitempty"`
-	Summary           string     `json:"summary,omitempty"`
-	URL               string     `json:"url,omitempty"`
-	Inbox             string     `json:"inbox"`
-	Outbox            string     `json:"outbox,omitempty"`
-	Followers         string     `json:"followers,omitempty"`
-	Following         string     `json:"following,omitempty"`
-	Endpoints         *Endpoints `json:"endpoints,omitempty"`
-	PublicKey         *PublicKey `json:"publicKey,omitempty"`
-	Discoverable      bool       `json:"discoverable,omitempty"`
-	Published         string     `json:"published,omitempty"`
+	Context                   any             `json:"@context,omitempty"`
+	ID                        string          `json:"id"`
+	Type                      string          `json:"type"`
+	PreferredUsername         string          `json:"preferredUsername"`
+	Name                      string          `json:"name,omitempty"`
+	Summary                   string          `json:"summary,omitempty"`
+	URL                       string          `json:"url,omitempty"`
+	Inbox                     string          `json:"inbox"`
+	Outbox                    string          `json:"outbox,omitempty"`
+	Followers                 string          `json:"followers,omitempty"`
+	Following                 string          `json:"following,omitempty"`
+	Endpoints                 *Endpoints      `json:"endpoints,omitempty"`
+	PublicKey                 *PublicKey      `json:"publicKey,omitempty"`
+	Icon                      *Media          `json:"icon,omitempty"`
+	Image                     *Media          `json:"image,omitempty"`
+	Attachment                []PropertyValue `json:"attachment,omitempty"`
+	Discoverable              bool            `json:"discoverable,omitempty"`
+	ManuallyApprovesFollowers bool            `json:"manuallyApprovesFollowers"`
+	Published                 string          `json:"published,omitempty"`
+}
+
+type Media struct {
+	Type      string `json:"type"`
+	MediaType string `json:"mediaType,omitempty"`
+	URL       string `json:"url"`
+}
+
+type PropertyValue struct {
+	Type  string `json:"type"`
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 type Endpoints struct {

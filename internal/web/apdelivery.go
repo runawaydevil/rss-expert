@@ -111,6 +111,7 @@ func rawFollow(follow *activitypub.Activity) []byte {
 
 func (a *App) note(post *publish.Post, handle string) *activitypub.Note {
 	uri := a.actorURI(handle)
+	to, cc := a.audience(post)
 	note := &activitypub.Note{
 		Context:      activitypub.Context(),
 		ID:           post.GUID,
@@ -121,8 +122,8 @@ func (a *App) note(post *publish.Post, handle string) *activitypub.Note {
 		InReplyTo:    post.InReplyTo,
 		Published:    post.Published.UTC().Format(time.RFC3339),
 		URL:          a.posts.PostURL(post.ID),
-		To:           []string{activitypub.Public},
-		Cc:           []string{uri + "/followers"},
+		To:           to,
+		Cc:           cc,
 	}
 	if post.Edited() {
 		note.Updated = post.Updated.UTC().Format(time.RFC3339)

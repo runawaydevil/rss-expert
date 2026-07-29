@@ -10,45 +10,53 @@ import (
 	"github.com/runawaydevil/rss-expert/internal/publish"
 )
 
+func (a *App) audience(post *publish.Post) ([]string, []string) {
+	followers := a.actorURI(post.Handle) + "/followers"
+	if post.Visibility == publish.VisibilityFollowers {
+		return []string{followers}, nil
+	}
+	return []string{activitypub.Public}, []string{followers}
+}
+
 func (a *App) createActivity(post *publish.Post) map[string]any {
-	uri := a.actorURI(post.Handle)
+	to, cc := a.audience(post)
 	return map[string]any{
 		"@context": activitypub.Context(),
 		"id":       post.GUID + "#create",
 		"type":     "Create",
-		"actor":    uri,
-		"to":       []string{activitypub.Public},
-		"cc":       []string{uri + "/followers"},
+		"actor":    a.actorURI(post.Handle),
+		"to":       to,
+		"cc":       cc,
 		"object":   a.note(post, post.Handle),
 	}
 }
 
 func (a *App) updateActivity(post *publish.Post) map[string]any {
-	uri := a.actorURI(post.Handle)
 	stamp := post.Updated
 	if stamp.IsZero() {
 		stamp = post.Published
 	}
+	to, cc := a.audience(post)
 	return map[string]any{
 		"@context": activitypub.Context(),
 		"id":       post.GUID + "#update-" + strconv.FormatInt(stamp.Unix(), 10),
 		"type":     "Update",
-		"actor":    uri,
-		"to":       []string{activitypub.Public},
-		"cc":       []string{uri + "/followers"},
+		"actor":    a.actorURI(post.Handle),
+		"to":       to,
+		"cc":       cc,
 		"object":   a.note(post, post.Handle),
 	}
 }
 
 func (a *App) deleteActivity(post *publish.Post) map[string]any {
-	uri := a.actorURI(post.Handle)
+	to, cc := a.audience(post)
 	return map[string]any{
 		"@context": activitypub.Context(),
 		"id":       post.GUID + "#delete",
 		"type":     "Delete",
-		"actor":    uri,
-		"to":       []string{activitypub.Public},
-		"cc":       []string{uri + "/followers"},
+		"actor":    a.actorURI(post.Handle),
+		"to":       to,
+		"cc":       cc,
 		"object": map[string]any{
 			"id":         post.GUID,
 			"type":       "Tombstone",
@@ -70,17 +78,15 @@ func (a *App) profileActivity(actor *activitypub.Actor) map[string]any {
 	}
 }
 
-func (a *App) replyActivity(post *publish.Post, to string) map[string]any {
-	uri := a.actorURI(post.Handle)
+func (a *App) replyActivity(post *publish.Post, target string) map[string]any {
 	note := a.note(post, post.Handle)
-	note.To = []string{to, activitypub.Public}
-	note.Cc = []string{uri + "/followers"}
+	note.To = append([]string{target}, note.To...)
 
 	return map[string]any{
 		"@context": activitypub.Context(),
 		"id":       post.GUID + "#create",
 		"type":     "Create",
-		"actor":    uri,
+		"actor":    a.actorURI(post.Handle),
 		"to":       note.To,
 		"cc":       note.Cc,
 		"object":   note,
@@ -126,15 +132,24 @@ func (a *App) broadcast(ctx context.Context, post *publish.Post, document map[st
 }
 
 func (a *App) FanOut(ctx context.Context, post *publish.Post) {
+	if !post.Federates() {
+		return
+	}
 	a.broadcast(ctx, post, a.createActivity(post))
 	a.ReplyAbroad(ctx, post)
 }
 
 func (a *App) AnnounceEdit(ctx context.Context, post *publish.Post) {
+	if !post.Federates() {
+		return
+	}
 	a.broadcast(ctx, post, a.updateActivity(post))
 }
 
 func (a *App) AnnounceWithdrawal(ctx context.Context, post *publish.Post) {
+	if !post.Federates() {
+		return
+	}
 	a.broadcast(ctx, post, a.deleteActivity(post))
 }
 

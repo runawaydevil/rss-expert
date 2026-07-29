@@ -102,6 +102,7 @@ func serve(ctx context.Context, args []string) error {
 	defer stopUpkeep()
 	go upkeep{
 		instance: instance,
+		db:       db,
 		ap:       activitypub.New(db),
 		push:     push.New(db),
 		accounts: accounts,

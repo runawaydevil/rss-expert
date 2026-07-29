@@ -96,7 +96,9 @@
 			</blockquote>
 			{{end}}
 
-			<div class="prose">{{.HTML}}</div>
+			<div class="prose{{if .Long}} prose-clamp{{end}}">{{.HTML}}</div>
+			{{if .Long}}<p class="read-more"><a href="{{.URL}}"
+				data-tip="The rest of this post, on its own page with any replies.">Read more</a></p>{{end}}
 
 			{{template "attachments" .}}
 

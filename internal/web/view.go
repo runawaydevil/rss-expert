@@ -32,6 +32,8 @@ type postView struct {
 	ArrivalTip   string
 	Read         bool
 	Saved        bool
+	Long         bool
+	Visibility   string
 	Key          string
 	InReplyTo    string
 	Local        bool
@@ -194,6 +196,7 @@ func timelineViews(items []ingest.Item) []postView {
 			ArrivalTip:   tipPolled,
 		}
 		view.Elsewhere = elsewhere(item.Enclosures)
+		view.Long = view.URL != "" && isLong(item.HTML)
 		if item.Edited() {
 			view.Arrival = "edited"
 			view.ArrivalTip = "The author changed this after publishing it. You are seeing the later version."
@@ -201,6 +204,27 @@ func timelineViews(items []ingest.Item) []postView {
 		out = append(out, view)
 	}
 	return out
+}
+
+const longPostRunes = 900
+
+func isLong(htmlContent string) bool {
+	count := 0
+	inTag := false
+	for _, r := range htmlContent {
+		switch {
+		case r == '<':
+			inTag = true
+		case r == '>':
+			inTag = false
+		case !inTag:
+			count++
+			if count > longPostRunes {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func initial(name string) string {
@@ -257,6 +281,10 @@ func localView(post *publish.Post) postView {
 		ReplyCount:   post.ReplyCount,
 		Attachments:  attachments(post.Media),
 	}
+	if !post.Public() {
+		view.Visibility = post.Visibility
+	}
+	view.Long = isLong(post.HTML)
 	if post.Edited() {
 		view.Arrival = "edited"
 		view.ArrivalTip = "The author changed this after publishing it. The edit travels in the same feed item."

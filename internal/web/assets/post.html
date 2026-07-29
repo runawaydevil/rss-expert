@@ -13,16 +13,18 @@
 	</header>
 
 	<main id="post">
-		<article class="post">
+		<article class="post h-entry">
 			<header class="post-head">
 				<span class="avatar" aria-hidden="true">{{.Post.Initial}}</span>
-				<span class="who">{{.Post.Author}}</span>
-				<a class="site" href="{{.Post.SiteURL}}"
+				<span class="who p-author">{{.Post.Author}}</span>
+				<a class="site u-url" href="{{.Post.SiteURL}}"
 					data-tip="Everything this account writes travels in one feed. This is where it lives.">{{.Post.Site}}</a>
-				<time class="when" datetime="{{.Post.PublishedISO}}">{{.Post.Age}}</time>
+				<time class="when dt-published" datetime="{{.Post.PublishedISO}}">{{.Post.Age}}</time>
+				{{if .Post.Visibility}}<span class="visibility-badge vis-{{.Post.Visibility}}"
+					data-tip="This post is kept out of public feeds. Only you see it here.">{{.Post.Visibility}}</span>{{end}}
 			</header>
 
-			{{if .Post.Title}}<h1 class="post-title">{{.Post.Title}}</h1>{{end}}
+			{{if .Post.Title}}<h1 class="post-title p-name">{{.Post.Title}}</h1>{{end}}
 
 			{{if .Post.InReplyTo}}
 			<p class="in-reply-to">In reply to
@@ -31,7 +33,7 @@
 			</p>
 			{{end}}
 
-			<div class="prose">{{.Post.HTML}}</div>
+			<div class="prose e-content">{{.Post.HTML}}</div>
 
 			{{template "attachments" .Post}}
 

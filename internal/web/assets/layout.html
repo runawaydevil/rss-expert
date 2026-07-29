@@ -4,6 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{.Title}}</title>
+<meta name="description" content="{{.Description}}">
+<meta name="robots" content="{{if .NoIndex}}noindex, nofollow{{else}}index, follow{{end}}">
+<link rel="canonical" href="{{.Canonical}}">
+<meta property="og:site_name" content="{{.SiteName}}">
+<meta property="og:type" content="{{.OGType}}">
+<meta property="og:title" content="{{.Title}}">
+<meta property="og:description" content="{{.Description}}">
+<meta property="og:url" content="{{.Canonical}}">
+<meta property="og:image" content="{{.OGImage}}">
+{{if .ArticleTime}}<meta property="article:published_time" content="{{.ArticleTime}}">{{end}}
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{{.Title}}">
+<meta name="twitter:description" content="{{.Description}}">
+<meta name="twitter:image" content="{{.OGImage}}">
 <link rel="icon" href="{{asset "favicon.ico"}}" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="{{asset "favicon.png"}}">
 <link rel="apple-touch-icon" href="{{asset "mark.png"}}">

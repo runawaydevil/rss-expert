@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -104,22 +105,58 @@ func (a *App) actorFor(ctx context.Context, handle string) (*activitypub.Actor, 
 		},
 	}
 
+	if profile, err := a.accounts.Profile(ctx, accountID); err == nil {
+		if profile.DisplayName != "" {
+			actor.Name = profile.DisplayName
+		}
+		if profile.Bio != "" {
+			actor.Summary = profile.Bio
+		}
+		actor.Icon = a.actorMedia(ctx, profile.AvatarSHA)
+		actor.Image = a.actorMedia(ctx, profile.BannerSHA)
+	}
+
+	if acc, err := a.accounts.ByID(ctx, accountID); err == nil && !acc.CreatedAt.IsZero() {
+		actor.Published = acc.CreatedAt.UTC().Format(time.RFC3339)
+	}
+
 	if sites, err := a.sites.ForAccount(ctx, accountID); err == nil {
 		for _, site := range sites {
 			if !site.Verified() {
 				continue
 			}
-			if site.Name != "" {
+			if actor.Name == canonical && site.Name != "" {
 				actor.Name = site.Name
 			}
-			actor.Summary = site.Note
 			if actor.Summary == "" {
-				actor.Summary = site.URL
+				actor.Summary = site.Note
+				if actor.Summary == "" {
+					actor.Summary = site.URL
+				}
 			}
-			break
+			actor.Attachment = append(actor.Attachment, activitypub.PropertyValue{
+				Type:  "PropertyValue",
+				Name:  site.Host,
+				Value: fmt.Sprintf(`<a href="%s" rel="me nofollow noopener" target="_blank">%s</a>`, site.URL, site.Host),
+			})
 		}
 	}
 	return actor, nil
+}
+
+func (a *App) actorMedia(ctx context.Context, sha string) *activitypub.Media {
+	if sha == "" {
+		return nil
+	}
+	file, err := a.media.AnyBySHA(ctx, sha)
+	if err != nil {
+		return nil
+	}
+	return &activitypub.Media{
+		Type:      "Image",
+		MediaType: file.MediaType,
+		URL:       a.posts.BaseURL() + file.URL(),
+	}
 }
 
 var errNoSuchAccount = errors.New("web: no such account")

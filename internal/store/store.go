@@ -117,6 +117,13 @@ func (db *DB) Pragmas(ctx context.Context, pool *sql.DB) (map[string]string, err
 	return out, nil
 }
 
+func (db *DB) Optimize(ctx context.Context) error {
+	if _, err := db.Write.ExecContext(ctx, "pragma optimize"); err != nil {
+		return fmt.Errorf("store: optimize: %w", err)
+	}
+	return nil
+}
+
 func (db *DB) SizeOnDisk() (int64, error) {
 	var total int64
 	for _, suffix := range []string{"", "-wal", "-shm"} {

@@ -138,6 +138,8 @@ func New(db *store.DB, log *slog.Logger, domain string, o Options) *App {
 func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", a.timeline)
+	mux.HandleFunc("GET /robots.txt", a.robots)
+	mux.HandleFunc("GET /sitemap.xml", a.sitemap)
 	mux.HandleFunc("GET /events", a.events)
 	mux.HandleFunc("GET /login", a.auth.login)
 	mux.HandleFunc("POST /login", a.auth.submitLogin)
@@ -167,6 +169,8 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /users/{handle}/rss.xml", a.accountFeed)
 	mux.HandleFunc("GET /users/{handle}", a.profile)
 	mux.HandleFunc("GET /settings", a.auth.requireAccount(a.settingsPage))
+	mux.HandleFunc("GET /settings/profile", a.auth.requireAccount(a.profileSettings))
+	mux.HandleFunc("POST /settings/profile", a.auth.requireAccount(a.saveProfile))
 	mux.HandleFunc("GET /settings/sites", a.auth.requireAccount(a.sitesPage))
 	mux.HandleFunc("POST /settings/sites/claim", a.auth.requireAccount(a.claimSite))
 	mux.HandleFunc("POST /settings/sites/verify", a.auth.requireAccount(a.verifySite))
@@ -267,6 +271,7 @@ func (a *App) host() string {
 func (a *App) render(w http.ResponseWriter, r *http.Request, name string, data map[string]any) {
 	data["Account"] = accountFrom(r.Context())
 	data["CSRF"] = csrfToken(w, r, a.behindProxy)
+	a.seoDefaults(r, data)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := templates.ExecuteTemplate(w, name, data); err != nil {

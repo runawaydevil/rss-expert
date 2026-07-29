@@ -1,0 +1,56 @@
+{{template "head" .}}
+<body>
+<a class="skip" href="#profile">Skip to your profile</a>
+
+<div class="page">
+	<header class="masthead">
+		<a class="wordmark" href="/"><img src="{{asset "mark.png"}}" alt="" width="40" height="40" decoding="async"> rss&#8202;expert</a>
+		<a class="button-primary" href="/settings">Back to settings</a>
+	</header>
+
+	<main id="profile">
+		<h1>Your profile</h1>
+		<p class="lead">This is what people see on your page here, and what the fediverse reads when
+		someone opens <strong>@{{.Handle}}@{{.Host}}</strong> from Mastodon. A name, a picture and a
+		line about you are what turn a bare handle into a profile.</p>
+
+		{{if .Problem}}
+		<p class="form-problem" role="alert">{{.Problem}}</p>
+		{{end}}
+
+		<form class="panel form" method="post" action="/settings/profile" enctype="multipart/form-data">
+			<input type="hidden" name="csrf" value="{{.CSRF}}">
+
+			<label for="display_name">Display name <span class="optional">shown above your handle</span></label>
+			<input id="display_name" name="display_name" type="text" maxlength="80"
+				value="{{.Profile.DisplayName}}" placeholder="{{.Handle}}">
+
+			<label for="bio">Bio <span class="optional">a line or two about you, up to {{.MaxBio}} characters</span></label>
+			<textarea id="bio" name="bio" rows="4" maxlength="{{.MaxBio}}">{{.Profile.Bio}}</textarea>
+
+			<label for="avatar">Picture <span class="optional">a square image reads best</span></label>
+			{{if .AvatarURL}}
+			<p class="profile-current"><img class="avatar-preview" src="{{.AvatarURL}}" alt="Your current picture"></p>
+			<label class="check"><input type="checkbox" name="remove_avatar" value="1"> Remove the current picture</label>
+			{{end}}
+			<input id="avatar" name="avatar" type="file" accept="image/jpeg,image/png,image/gif,image/webp">
+
+			<label for="banner">Header <span class="optional">a wide image behind your name</span></label>
+			{{if .BannerURL}}
+			<p class="profile-current"><img class="banner-preview" src="{{.BannerURL}}" alt="Your current header"></p>
+			<label class="check"><input type="checkbox" name="remove_banner" value="1"> Remove the current header</label>
+			{{end}}
+			<input id="banner" name="banner" type="file" accept="image/jpeg,image/png,image/gif,image/webp">
+
+			<button type="submit" class="button-primary">Save</button>
+
+			<p class="form-aside">Pictures go through your files, so location and camera data are stripped
+			before anything is stored. Your verified sites show as links on your fediverse profile — add
+			them under <a href="/settings/sites">Your site</a>.</p>
+		</form>
+	</main>
+</div>
+
+{{template "colophon" .}}
+</body>
+</html>

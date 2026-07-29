@@ -77,6 +77,14 @@ func (a *App) postPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !post.Public() {
+		account := accountFrom(r.Context())
+		if account == nil || (account.ID != post.AccountID && !account.Role.CanModerate()) {
+			http.NotFound(w, r)
+			return
+		}
+	}
+
 	w.Header().Set("Vary", "Accept")
 	if a.federates && wantsActivityJSON(r) {
 		writeActivityJSON(w, http.StatusOK, a.note(post, post.Handle))
@@ -105,13 +113,30 @@ func (a *App) postPage(w http.ResponseWriter, r *http.Request) {
 		mine = post.AccountID == account.ID || account.Role.CanModerate()
 	}
 
+	view := localView(post)
+	description := textExcerpt(post.HTML, 160)
+	if description == "" {
+		description = "A post by " + post.Handle
+	}
+	ogImage := a.absURL("/assets/mark.png")
+	for _, att := range view.Attachments {
+		if att.IsImage() {
+			ogImage = a.absURL(att.URL)
+			break
+		}
+	}
+
 	a.render(w, r, "post.html", map[string]any{
-		"Title":      title + " — RSS Expert",
-		"Mine":       mine,
-		"Post":       localView(post),
-		"Replies":    localViews(replies),
-		"Thread":     branches,
-		"RepliesURL": a.posts.RepliesPath(post.ID),
+		"Title":       title + " — RSS Expert",
+		"Mine":        mine,
+		"Post":        view,
+		"Replies":     localViews(replies),
+		"Thread":      branches,
+		"RepliesURL":  a.posts.RepliesPath(post.ID),
+		"Description": description,
+		"OGType":      "article",
+		"OGImage":     ogImage,
+		"ArticleTime": view.PublishedISO,
 	})
 }
 
@@ -150,8 +175,9 @@ func (a *App) submitWrite(w http.ResponseWriter, r *http.Request) {
 	title := r.PostFormValue("title")
 	source := r.PostFormValue("markdown")
 	inReplyTo := r.PostFormValue("in_reply_to")
+	visibility := r.PostFormValue("visibility")
 
-	post, err := a.posts.Create(r.Context(), account, title, source, inReplyTo)
+	post, err := a.posts.CreateVisible(r.Context(), account, title, source, inReplyTo, visibility)
 	if err != nil {
 		switch {
 		case errors.Is(err, publish.ErrEmptyPost):

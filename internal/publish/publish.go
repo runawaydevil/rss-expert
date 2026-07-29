@@ -40,6 +40,21 @@ var (
 	sanitise = bluemonday.UGCPolicy()
 )
 
+const (
+	VisibilityPublic    = "public"
+	VisibilityFollowers = "followers"
+	VisibilityPrivate   = "private"
+)
+
+func NormalizeVisibility(v string) string {
+	switch v {
+	case VisibilityFollowers, VisibilityPrivate:
+		return v
+	default:
+		return VisibilityPublic
+	}
+}
+
 type Post struct {
 	ID         int64
 	AccountID  int64
@@ -50,6 +65,7 @@ type Post struct {
 	Markdown   string
 	HTML       string
 	InReplyTo  string
+	Visibility string
 	Published  time.Time
 	Updated    time.Time
 	Deleted    bool
@@ -59,6 +75,14 @@ type Post struct {
 
 func (p *Post) Edited() bool {
 	return !p.Updated.IsZero() && p.Updated.After(p.Published)
+}
+
+func (p *Post) Public() bool {
+	return p.Visibility == "" || p.Visibility == VisibilityPublic
+}
+
+func (p *Post) Federates() bool {
+	return p.Visibility != VisibilityPrivate
 }
 
 type Store struct {
@@ -106,8 +130,10 @@ func (s *Store) RefreshProjection(ctx context.Context, id int64) (*Post, error) 
 	if err != nil {
 		return nil, err
 	}
-	if err := s.project(ctx, post); err != nil {
-		return nil, err
+	if post.Public() {
+		if err := s.project(ctx, post); err != nil {
+			return nil, err
+		}
 	}
 	return post, nil
 }
@@ -147,8 +173,13 @@ func Render(source string) (string, error) {
 }
 
 func (s *Store) Create(ctx context.Context, account *identity.Account, title, source, inReplyTo string) (*Post, error) {
+	return s.CreateVisible(ctx, account, title, source, inReplyTo, VisibilityPublic)
+}
+
+func (s *Store) CreateVisible(ctx context.Context, account *identity.Account, title, source, inReplyTo, visibility string) (*Post, error) {
 	source = strings.TrimSpace(source)
 	title = strings.TrimSpace(title)
+	visibility = NormalizeVisibility(visibility)
 
 	if source == "" {
 		return nil, ErrEmptyPost
@@ -175,9 +206,9 @@ func (s *Store) Create(ctx context.Context, account *identity.Account, title, so
 
 	now := time.Now().UTC().Truncate(time.Second)
 	res, err := s.db.Write.ExecContext(ctx,
-		`insert into post (account_id, guid, title, markdown, html, in_reply_to, published_at)
-		 values (?, '', ?, ?, ?, ?, ?)`,
-		account.ID, nullable(title), source, html, nullable(inReplyTo), now.Unix())
+		`insert into post (account_id, guid, title, markdown, html, in_reply_to, visibility, published_at)
+		 values (?, '', ?, ?, ?, ?, ?, ?)`,
+		account.ID, nullable(title), source, html, nullable(inReplyTo), visibility, now.Unix())
 	if err != nil {
 		return nil, fmt.Errorf("publish: create post: %w", err)
 	}
@@ -194,10 +225,12 @@ func (s *Store) Create(ctx context.Context, account *identity.Account, title, so
 	post := &Post{
 		ID: id, AccountID: account.ID, Handle: handle, Author: account.Email,
 		GUID: guid, Title: title, Markdown: source, HTML: html,
-		InReplyTo: inReplyTo, Published: now,
+		InReplyTo: inReplyTo, Visibility: visibility, Published: now,
 	}
-	if err := s.project(ctx, post); err != nil {
-		return nil, fmt.Errorf("publish: project into the timeline: %w", err)
+	if post.Public() {
+		if err := s.project(ctx, post); err != nil {
+			return nil, fmt.Errorf("publish: project into the timeline: %w", err)
+		}
 	}
 	return post, nil
 }
@@ -242,8 +275,10 @@ func (s *Store) Update(ctx context.Context, account *identity.Account, id int64,
 	post.Markdown = source
 	post.HTML = html
 	post.Updated = now
-	if err := s.project(ctx, post); err != nil {
-		return nil, fmt.Errorf("publish: project the edit: %w", err)
+	if post.Public() {
+		if err := s.project(ctx, post); err != nil {
+			return nil, fmt.Errorf("publish: project the edit: %w", err)
+		}
 	}
 	return post, nil
 }
@@ -266,6 +301,7 @@ func (s *Store) Delete(ctx context.Context, account *identity.Account, id int64)
 
 const postColumns = `p.id, p.account_id, coalesce(a.handle, ''), a.email, p.guid,
 	coalesce(p.title, ''), p.markdown, p.html, coalesce(p.in_reply_to, ''),
+	coalesce(p.visibility, 'public'),
 	p.published_at, coalesce(p.updated_at, 0), p.deleted_at is not null,
 	(select count(*) from post r where r.in_reply_to = p.guid and r.deleted_at is null)`
 
@@ -275,7 +311,7 @@ func scanPost(row interface{ Scan(...any) error }) (*Post, error) {
 		published, updated int64
 	)
 	err := row.Scan(&p.ID, &p.AccountID, &p.Handle, &p.Author, &p.GUID, &p.Title,
-		&p.Markdown, &p.HTML, &p.InReplyTo, &published, &updated, &p.Deleted, &p.ReplyCount)
+		&p.Markdown, &p.HTML, &p.InReplyTo, &p.Visibility, &published, &updated, &p.Deleted, &p.ReplyCount)
 	if err != nil {
 		return nil, err
 	}
@@ -323,6 +359,13 @@ func (s *Store) query(ctx context.Context, where string, args ...any) ([]*Post, 
 
 func (s *Store) ByHandle(ctx context.Context, handle string, limit int) ([]*Post, error) {
 	return s.query(ctx,
+		`where a.handle = ? and p.deleted_at is null and p.visibility = 'public'
+		 order by p.published_at desc, p.id desc limit ?`,
+		handle, limit)
+}
+
+func (s *Store) ByHandleIncludingHidden(ctx context.Context, handle string, limit int) ([]*Post, error) {
+	return s.query(ctx,
 		`where a.handle = ? and p.deleted_at is null order by p.published_at desc, p.id desc limit ?`,
 		handle, limit)
 }
@@ -332,18 +375,21 @@ func (s *Store) CountByHandle(ctx context.Context, handle string) (int, error) {
 	err := s.db.Read.QueryRowContext(ctx,
 		`select count(*) from post p
 		 join account a on a.id = p.account_id
-		 where a.handle = ? and p.deleted_at is null`,
+		 where a.handle = ? and p.deleted_at is null and p.visibility = 'public'`,
 		handle).Scan(&count)
 	return count, err
 }
 
 func (s *Store) Recent(ctx context.Context, limit int) ([]*Post, error) {
-	return s.query(ctx, `where p.deleted_at is null order by p.published_at desc, p.id desc limit ?`, limit)
+	return s.query(ctx,
+		`where p.deleted_at is null and p.visibility = 'public'
+		 order by p.published_at desc, p.id desc limit ?`, limit)
 }
 
 func (s *Store) Replies(ctx context.Context, guid string, limit int) ([]*Post, error) {
 	return s.query(ctx,
-		`where p.in_reply_to = ? and p.deleted_at is null order by p.published_at, p.id limit ?`,
+		`where p.in_reply_to = ? and p.deleted_at is null and p.visibility = 'public'
+		 order by p.published_at, p.id limit ?`,
 		guid, limit)
 }
 

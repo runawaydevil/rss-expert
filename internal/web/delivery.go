@@ -43,10 +43,12 @@ func queueSpec(mentionID int64) jobs.Spec {
 }
 
 func (a *App) afterPublish(r *http.Request, post *publish.Post) {
-	a.announce(context.WithoutCancel(r.Context()), post)
+	if post.Public() {
+		a.announce(context.WithoutCancel(r.Context()), post)
+	}
 	a.FanOut(context.WithoutCancel(r.Context()), post)
 
-	if post.InReplyTo == "" {
+	if !post.Public() || post.InReplyTo == "" {
 		return
 	}
 	_, err := a.queue.Enqueue(r.Context(), jobs.Spec{
@@ -61,13 +63,17 @@ func (a *App) afterPublish(r *http.Request, post *publish.Post) {
 
 func (a *App) afterEdit(r *http.Request, post *publish.Post) {
 	ctx := context.WithoutCancel(r.Context())
-	a.announce(ctx, post)
+	if post.Public() {
+		a.announce(ctx, post)
+	}
 	a.AnnounceEdit(ctx, post)
 }
 
 func (a *App) afterWithdraw(r *http.Request, post *publish.Post) {
 	ctx := context.WithoutCancel(r.Context())
-	a.announce(ctx, post)
+	if post.Public() {
+		a.announce(ctx, post)
+	}
 	a.AnnounceWithdrawal(ctx, post)
 }
 

@@ -13,8 +13,17 @@
 	</header>
 
 	<main id="posts">
-		<section class="h-card identity">
-			<h1 class="p-name">{{if .Verified}}{{if .Verified.Name}}{{.Verified.Name}}{{else}}{{.Handle}}{{end}}{{else}}{{.Handle}}{{end}}</h1>
+		<section class="h-card identity{{if .BannerURL}} has-banner{{end}}">
+			{{if .BannerURL}}<img class="identity-banner" src="{{.BannerURL}}" alt="">{{end}}
+
+			<div class="identity-head">
+				{{if .AvatarURL}}
+				<img class="u-photo identity-avatar" src="{{.AvatarURL}}" alt="" width="96" height="96">
+				{{else}}
+				<span class="avatar identity-avatar" aria-hidden="true">{{.Initial}}</span>
+				{{end}}
+				<h1 class="p-name">{{if .DisplayName}}{{.DisplayName}}{{else if and .Verified .Verified.Name}}{{.Verified.Name}}{{else}}{{.Handle}}{{end}}</h1>
+			</div>
 
 			<p class="identity-line">
 				<span class="identity-badge identity-local">account here</span>
@@ -24,9 +33,11 @@
 				{{end}}
 			</p>
 
-			{{if .Verified}}{{if .Verified.Note}}
+			{{if .Bio}}
+			<p class="p-note identity-note">{{.Bio}}</p>
+			{{else if and .Verified .Verified.Note}}
 			<p class="p-note identity-note">{{.Verified.Note}}</p>
-			{{end}}{{end}}
+			{{end}}
 
 			<p class="identity-feeds">
 				<a href="{{.FeedURL}}">{{icon "rss"}} Everything {{.Handle}} writes</a>
@@ -63,6 +74,7 @@
 					<span class="avatar" aria-hidden="true">{{.Initial}}</span>
 					<span class="who">{{.Author}}</span>
 					<time class="when" datetime="{{.PublishedISO}}">{{.Age}}</time>
+					{{if .Visibility}}<span class="visibility-badge vis-{{.Visibility}}">{{.Visibility}}</span>{{end}}
 				</header>
 				{{if .Title}}<h2><a href="{{.URL}}">{{.Title}}</a></h2>{{end}}
 				<div class="prose">{{.HTML}}</div>

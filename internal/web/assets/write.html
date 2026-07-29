@@ -59,6 +59,15 @@
 			</fieldset>
 			{{end}}
 
+			{{if not .Editing}}
+			<label for="visibility">Who can see this</label>
+			<select id="visibility" name="visibility">
+				<option value="public">Public — in your feed, the timeline, and out to the fediverse</option>
+				<option value="followers">Followers only — sent to your fediverse followers, kept out of every public feed</option>
+				<option value="private">Private — only you, on this instance; it never leaves</option>
+			</select>
+			{{end}}
+
 			<p class="write-actions">
 				<button type="submit" class="button-primary">{{if .Editing}}Save{{else}}Publish{{end}}</button>
 				{{if not .Editing}}

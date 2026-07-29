@@ -20,7 +20,17 @@ func (a *App) profile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	accountID, _, _ := a.posts.AccountByHandle(ctx, handle)
+
+	owner := false
+	if viewer := accountFrom(ctx); viewer != nil {
+		owner = viewer.ID == accountID || viewer.Role.CanModerate()
+	}
+
 	posts, err := a.posts.ByHandle(ctx, handle, 40)
+	if owner {
+		posts, err = a.posts.ByHandleIncludingHidden(ctx, handle, 40)
+	}
 	if err != nil {
 		a.log.Error("could not read an account's posts", "error", err)
 	}
@@ -28,12 +38,20 @@ func (a *App) profile(w http.ResponseWriter, r *http.Request) {
 	data := map[string]any{
 		"Title":   handle + " — RSS Expert",
 		"Handle":  handle,
+		"Initial": initial(handle),
 		"Posts":   localViews(posts),
 		"FeedURL": "/users/" + handle + "/rss.xml",
 	}
 
-	if len(posts) > 0 {
-		sites, err := a.sites.ForAccount(ctx, posts[0].AccountID)
+	if accountID != 0 {
+		if profile, err := a.accounts.Profile(ctx, accountID); err == nil {
+			data["DisplayName"] = profile.DisplayName
+			data["Bio"] = profile.Bio
+			data["AvatarURL"] = mediaURL(profile.AvatarSHA)
+			data["BannerURL"] = mediaURL(profile.BannerSHA)
+		}
+
+		sites, err := a.sites.ForAccount(ctx, accountID)
 		if err != nil {
 			a.log.Error("could not read sites", "error", err)
 		}
@@ -44,6 +62,16 @@ func (a *App) profile(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 		}
+	}
+
+	data["OGType"] = "profile"
+	if bio, _ := data["Bio"].(string); bio != "" {
+		data["Description"] = bio
+	} else {
+		data["Description"] = "Everything " + handle + " writes, in one feed you can follow."
+	}
+	if avatar, _ := data["AvatarURL"].(string); avatar != "" {
+		data["OGImage"] = a.absURL(avatar)
 	}
 	a.render(w, r, "profile.html", data)
 }

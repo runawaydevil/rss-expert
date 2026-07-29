@@ -143,8 +143,9 @@ func TestTheRepliesLinkDoesNotHardcodeTheDomain(t *testing.T) {
 	}
 
 	page, _ := io.ReadAll(get(t, h, "/p/"+strconv.FormatInt(post.ID, 10)).Body)
-	if strings.Contains(string(page), `href="https://old-domain.example`) {
-		t.Errorf("the post page links out to the configured domain; a domain change breaks it:\n%s", page)
+	absoluteAnchor := regexp.MustCompile(`<a\b[^>]*\bhref="https://old-domain\.example`)
+	if absoluteAnchor.Match(page) {
+		t.Errorf("a link on the post page hardcodes the configured domain; a domain change breaks it:\n%s", page)
 	}
 	if !strings.Contains(string(page), `href="/p/`) {
 		t.Error("the replies link is not a relative path")

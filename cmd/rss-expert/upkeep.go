@@ -10,6 +10,7 @@ import (
 	"github.com/runawaydevil/rss-expert/internal/ingest"
 	"github.com/runawaydevil/rss-expert/internal/jobs"
 	"github.com/runawaydevil/rss-expert/internal/push"
+	"github.com/runawaydevil/rss-expert/internal/store"
 	"github.com/runawaydevil/rss-expert/internal/web"
 )
 
@@ -21,6 +22,7 @@ const (
 
 type upkeep struct {
 	instance *web.App
+	db       *store.DB
 	ap       *activitypub.Store
 	push     *push.Store
 	accounts *identity.Store
@@ -83,5 +85,9 @@ func (u upkeep) once(ctx context.Context) {
 
 	if n := u.instance.RenewPush(ctx); n > 0 {
 		u.log.Info("renewed push subscriptions", "count", n)
+	}
+
+	if err := u.db.Optimize(ctx); err != nil {
+		u.log.Warn("could not run sqlite optimize", "error", err)
 	}
 }

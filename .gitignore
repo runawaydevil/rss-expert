@@ -25,6 +25,7 @@
 
 # Notes and design documents: personal for now, not published
 /docs/
+CLAUDE.md
 
 # Environment (.env.example is the only one that travels)
 .env
