@@ -146,14 +146,23 @@ and tells its subscribers the moment something is published. Feeds it cannot get
 by push are polled on an adapting schedule with conditional requests.
 
 Set RSS_EXPERT_ACTIVITYPUB and @handle@yourdomain becomes an address the
-fediverse can follow: WebFinger, an actor document, a signed inbox, and one
-Create per follower when you publish. The outbox carries recent Create
-activities, and signed Note replies to a local post enter the same thread as
-replies learned from feeds. The actor that answered is recorded as provenance,
-not as a subscription: it never joins the list of feeds this instance follows
-and is never polled as though it were one. Answering a remote post from here is
-still to come. Off means the routes do not exist, not that they answer
-politely.
+fediverse can follow: WebFinger, an actor document, a signed inbox and shared
+inbox, followers and following and outbox collections, and one Create per
+follower when you publish. Editing a post sends an Update, withdrawing it sends
+a Delete, and both reach your followers. Replies cross in both directions: a
+Note written on Mastodon joins the local thread, and a reply written here is
+delivered back to the remote author's inbox. Likes and boosts are accepted and
+counted. The actor that answered is recorded as provenance, not as a
+subscription: it never joins the list of feeds this instance follows and is
+never polled as though it were one. Off means the routes do not exist, not that
+they answer politely.
+
+Signatures speak RFC 9421, the standard, as well as the expired
+draft-cavage-http-signatures-12 the fediverse still runs on. Which one goes to a
+given host is chosen by double-knocking: try what worked last, fall back on
+refusal, remember the winner. Both directions are proven against known vectors,
+and every forgery -- wrong key, tampered body, rewritten header, stale stamp,
+unsigned -- is refused.
 
 Settle the domain before turning it on. Actor, key and post identifiers are
 absolute URLs on it and every receiver enforces origin matching, so moving
