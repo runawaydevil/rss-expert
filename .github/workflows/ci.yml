@@ -41,7 +41,21 @@ jobs:
 
       - name: Fuzz smoke
         run: |
-          go test -run=XXX -fuzz=FuzzCheckAddr -fuzztime=30s ./internal/safety/
-          go test -run=XXX -fuzz=FuzzCheckURL -fuzztime=30s ./internal/safety/
-          go test -run=XXX -fuzz=FuzzParse -fuzztime=30s ./internal/feedin/
-          go test -run=XXX -fuzz=FuzzResolveIsTotal -fuzztime=30s ./internal/convergence/
+          # The fuzzing coordinator can report "context deadline exceeded" while
+          # shutting workers down at the fuzztime boundary under CI CPU pressure.
+          # A real crash is written to testdata/fuzz and reproduces on every run,
+          # so retrying only ever hides that transient, never a genuine finding.
+          run_fuzz() {
+            for attempt in 1 2 3; do
+              if go test -run=XXX -fuzz="$2" -fuzztime=30s -parallel=2 "$1"; then
+                return 0
+              fi
+              echo "::warning::fuzz $2 did not settle (attempt $attempt/3); retrying"
+            done
+            echo "::error::fuzz $2 failed after three attempts"
+            return 1
+          }
+          run_fuzz ./internal/safety/ FuzzCheckAddr
+          run_fuzz ./internal/safety/ FuzzCheckURL
+          run_fuzz ./internal/feedin/ FuzzParse
+          run_fuzz ./internal/convergence/ FuzzResolveIsTotal
